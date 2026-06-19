@@ -11,13 +11,11 @@ import type {
 } from '@shared/types'
 import { REFERENCE_LIMIT } from '@shared/types'
 import { getDb } from './index'
+import { now, type Row } from './util'
 import { decodeDataUrl, deleteImage, mediaUrl, saveImage, thumbKey } from '../services/images'
 import { storagePathFor } from '../paths'
 import { readFileSync } from 'fs'
 import { posix } from 'path'
-
-const now = (): string => new Date().toISOString().slice(0, 19).replace('T', ' ')
-type Row = Record<string, unknown>
 
 // ---------- serialization ----------
 
@@ -285,6 +283,40 @@ export function referenceImagesForCharacter(characterId: number): RefImageRow[] 
 
 export function updateVibeCache(imageId: number, vibe: string): void {
   getDb().prepare('UPDATE character_images SET vibe_cache = ? WHERE id = ?').run(vibe, imageId)
+}
+
+export interface RandomCharacter {
+  id: number
+  name: string
+  prompt: string
+  negative_prompt: string
+  prompt_replacements: PromptReplacement[]
+}
+
+// Characters carrying a tag, by name — used for "scene × tag" batches.
+export function charactersByTag(tagId: number): { id: number; name: string }[] {
+  return getDb()
+    .prepare(
+      `SELECT c.id, c.name FROM characters c
+       JOIN character_tags ct ON ct.character_id = c.id
+       WHERE ct.tag_id = ? ORDER BY c.name`
+    )
+    .all(tagId) as { id: number; name: string }[]
+}
+
+// One random registered character — used for situation test shots.
+export function randomCharacter(): RandomCharacter | null {
+  const r = getDb()
+    .prepare('SELECT * FROM characters ORDER BY RANDOM() LIMIT 1')
+    .get() as Row | undefined
+  if (!r) return null
+  return {
+    id: r.id as number,
+    name: r.name as string,
+    prompt: r.prompt as string,
+    negative_prompt: r.negative_prompt as string,
+    prompt_replacements: parseReplacements(r.prompt_replacements as string)
+  }
 }
 
 export function characterPrompt(characterId: number): { prompt: string; negative_prompt: string } {

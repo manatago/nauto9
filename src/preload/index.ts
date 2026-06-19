@@ -23,11 +23,46 @@ const api: Api = {
       invoke('characterImages:saveFromPath', characterId, imagePath) as Promise<never>,
     dragOut: (imagePath) => ipcRenderer.send('characterImages:dragOut', imagePath)
   },
+  stories: {
+    list: () => invoke('stories:list') as Promise<never>,
+    create: (name) => invoke('stories:create', name) as Promise<never>,
+    rename: (id, name) => invoke('stories:rename', id, name) as Promise<never>,
+    delete: (id) => invoke('stories:delete', id) as Promise<never>,
+    reorder: (ids) => invoke('stories:reorder', ids) as Promise<never>
+  },
+  situations: {
+    listByStory: (storyId) => invoke('situations:listByStory', storyId) as Promise<never>,
+    listAll: () => invoke('situations:listAll') as Promise<never>,
+    get: (id) => invoke('situations:get', id) as Promise<never>,
+    create: (input) => invoke('situations:create', input) as Promise<never>,
+    update: (id, input) => invoke('situations:update', id, input) as Promise<never>,
+    delete: (id) => invoke('situations:delete', id) as Promise<never>,
+    reorder: (storyId, ids) => invoke('situations:reorder', storyId, ids) as Promise<never>,
+    preview: (id) => invoke('situations:preview', id) as Promise<never>
+  },
   tags: {
     list: () => invoke('tags:list') as Promise<never>,
     create: (name) => invoke('tags:create', name) as Promise<never>,
     rename: (id, name) => invoke('tags:rename', id, name) as Promise<never>,
     delete: (id) => invoke('tags:delete', id) as Promise<never>
+  },
+  situationTags: {
+    list: () => invoke('situationTags:list') as Promise<never>,
+    create: (name) => invoke('situationTags:create', name) as Promise<never>,
+    rename: (id, name) => invoke('situationTags:rename', id, name) as Promise<never>,
+    delete: (id) => invoke('situationTags:delete', id) as Promise<never>
+  },
+  batches: {
+    list: () => invoke('batches:list') as Promise<never>,
+    create: (input) => invoke('batches:create', input) as Promise<never>,
+    createScene: (input) => invoke('batches:createScene', input) as Promise<never>,
+    delete: (id) => invoke('batches:delete', id) as Promise<never>,
+    download: (id) => invoke('batches:download', id) as Promise<never>
+  },
+  generations: {
+    regenerate: (id) => invoke('generations:regenerate', id) as Promise<never>,
+    imageData: (id) => invoke('generations:imageData', id) as Promise<never>,
+    saveImage: (id, dataUrl) => invoke('generations:saveImage', id, dataUrl) as Promise<never>
   },
   settings: {
     get: (key) => invoke('settings:get', key) as Promise<never>,

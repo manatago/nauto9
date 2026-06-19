@@ -1,5 +1,5 @@
 import useSWR from 'swr'
-import type { Character, CharacterListItem, Tag } from '@shared/types'
+import type { Batch, Character, CharacterListItem, Situation, Story, Tag } from '@shared/types'
 
 export const api = window.api
 
@@ -33,6 +33,37 @@ export function useCharacter(id: number | null): {
 
 export function useTags(): { data: Tag[] | undefined; mutate: Revalidate } {
   const { data, mutate } = useSWR<Tag[]>('tags', () => api.tags.list())
+  return { data, mutate: () => mutate() }
+}
+
+export function useStories(): { data: Story[] | undefined; mutate: Revalidate } {
+  const { data, mutate } = useSWR<Story[]>('stories', () => api.stories.list())
+  return { data, mutate: () => mutate() }
+}
+
+// Situation tags are a separate pool from character tags.
+export function useSituationTags(): { data: Tag[] | undefined; mutate: Revalidate } {
+  const { data, mutate } = useSWR<Tag[]>('situationTags', () => api.situationTags.list())
+  return { data, mutate: () => mutate() }
+}
+
+// Polls while any batch is still processing/pending so progress updates live.
+export function useBatches(): { data: Batch[] | undefined; mutate: Revalidate } {
+  const { data, mutate } = useSWR<Batch[]>('batches', () => api.batches.list(), {
+    refreshInterval: (latest) =>
+      latest?.some((b) => b.status === 'processing' || b.status === 'pending') ? 1500 : 0
+  })
+  return { data, mutate: () => mutate() }
+}
+
+// storyId === null -> all situations across stories (cross-cut view).
+export function useSituations(storyId: number | null): {
+  data: Situation[] | undefined
+  mutate: Revalidate
+} {
+  const { data, mutate } = useSWR<Situation[]>(['situations', storyId ?? 'all'], () =>
+    storyId == null ? api.situations.listAll() : api.situations.listByStory(storyId)
+  )
   return { data, mutate: () => mutate() }
 }
 

@@ -8,9 +8,17 @@ interface ModalProps {
   onClose: () => void
   children: ReactNode
   wide?: boolean
+  backgroundUrl?: string // dimmed image shown behind the panel content
 }
 
-export default function Modal({ open, title, onClose, children, wide }: ModalProps): JSX.Element | null {
+export default function Modal({
+  open,
+  title,
+  onClose,
+  children,
+  wide,
+  backgroundUrl
+}: ModalProps): JSX.Element | null {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent): void => {
@@ -28,10 +36,16 @@ export default function Modal({ open, title, onClose, children, wide }: ModalPro
       onMouseDown={onClose}
     >
       <div
-        className={`mt-10 w-full ${wide ? 'max-w-5xl' : 'max-w-xl'} rounded-xl border border-ink-600 bg-ink-800 shadow-2xl`}
+        className={`relative mt-10 w-full overflow-hidden ${wide ? 'max-w-5xl' : 'max-w-xl'} rounded-xl border border-ink-600 bg-ink-800 shadow-2xl`}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-ink-700 px-5 py-3">
+        {backgroundUrl && (
+          <img
+            src={backgroundUrl}
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-10"
+          />
+        )}
+        <div className="relative flex items-center justify-between border-b border-ink-700 px-5 py-3">
           <h2 className="text-sm font-semibold tracking-wide text-ink-200">{title}</h2>
           <button
             className="rounded p-1 text-ink-500 hover:bg-ink-700 hover:text-ink-200"
@@ -40,7 +54,7 @@ export default function Modal({ open, title, onClose, children, wide }: ModalPro
             <X size={18} />
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className="relative px-5 py-4">{children}</div>
       </div>
     </div>,
     document.body

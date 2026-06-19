@@ -1,6 +1,7 @@
 import { protocol, net } from 'electron'
 import { pathToFileURL } from 'url'
 import { normalize, sep } from 'path'
+import { existsSync } from 'fs'
 import { storageRoot, storagePathFor } from './paths'
 
 export const MEDIA_SCHEME = 'media'
@@ -29,6 +30,10 @@ export function registerMediaProtocol(): void {
       if (abs !== root && !abs.startsWith(root + sep)) {
         return new Response('forbidden', { status: 403 })
       }
+      // Missing files (e.g. a just-deleted/regenerated image still referenced by
+      // a stale <img>) must return 404, not let net.fetch reject and spam the
+      // terminal with net::ERR_FILE_NOT_FOUND.
+      if (!existsSync(abs)) return new Response(null, { status: 404 })
       return net.fetch(pathToFileURL(abs).toString())
     } catch {
       return new Response('bad request', { status: 400 })

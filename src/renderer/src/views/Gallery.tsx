@@ -1,0 +1,187 @@
+import { useState } from 'react'
+import { Download, Loader2, Trash2, TriangleAlert } from 'lucide-react'
+import type { Batch, BatchStatus, Generation } from '@shared/types'
+import { api, useBatches } from '../api'
+import { useToast } from '../components/Toast'
+import GenerationViewer from '../components/GenerationViewer'
+
+const STATUS_LABEL: Record<BatchStatus, string> = {
+  pending: '待機中',
+  processing: '生成中',
+  completed: '完了',
+  failed: '失敗',
+  cancelled: '中止'
+}
+
+function GenCell({
+  g,
+  retrying,
+  onOpen,
+  onRetry
+}: {
+  g: Generation
+  retrying: boolean
+  onOpen: () => void
+  onRetry: () => void
+}): JSX.Element {
+  if (g.status === 'pending')
+    return (
+      <div className="flex aspect-[2/3] items-center justify-center rounded-md border border-ink-700 bg-ink-900 text-ink-600">
+        <Loader2 size={18} className="animate-spin" />
+      </div>
+    )
+  if (g.status === 'failed' || !g.thumbnail_url)
+    return (
+      <button
+        onClick={onRetry}
+        disabled={retrying}
+        title={g.error ?? '再生成'}
+        className="flex aspect-[2/3] flex-col items-center justify-center gap-1 rounded-md border border-red-500/30 bg-red-950/30 p-1 text-center text-[10px] text-red-300 hover:border-accent/50 hover:text-accent disabled:opacity-50"
+      >
+        {retrying ? <Loader2 size={16} className="animate-spin" /> : <TriangleAlert size={16} />}
+        {retrying ? '再生成中' : '失敗・再生成'}
+      </button>
+    )
+  return (
+    <button onClick={onOpen} className="overflow-hidden rounded-md border border-ink-700">
+      <img src={g.thumbnail_url} className="aspect-[2/3] w-full object-cover hover:opacity-90" />
+    </button>
+  )
+}
+
+export default function Gallery(): JSX.Element {
+  const toast = useToast()
+  const { data: batches, mutate } = useBatches()
+  const [viewer, setViewer] = useState<{ batchId: number; index: number } | null>(null)
+  const [downloading, setDownloading] = useState<number | null>(null)
+  const [retryingIds, setRetryingIds] = useState<number[]>([])
+
+  const successOf = (b: Batch): Generation[] =>
+    b.generations.filter((g) => g.status === 'success' && g.image_url)
+
+  async function download(b: Batch): Promise<void> {
+    setDownloading(b.id)
+    try {
+      const { saved } = await api.batches.download(b.id)
+      if (saved) toast.success('ZIP を保存しました')
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  async function remove(b: Batch): Promise<void> {
+    if (!confirm(`バッチ「${b.name}」と生成画像を削除しますか？`)) return
+    await api.batches.delete(b.id)
+    if (viewer?.batchId === b.id) setViewer(null)
+    mutate()
+  }
+
+  async function retry(g: Generation): Promise<void> {
+    setRetryingIds((ids) => [...ids, g.id])
+    try {
+      await api.generations.regenerate(g.id)
+      mutate()
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setRetryingIds((ids) => ids.filter((x) => x !== g.id))
+    }
+  }
+
+  // Live data for the viewer (so regenerate/mosaic results show immediately).
+  const viewerBatch = viewer ? batches?.find((b) => b.id === viewer.batchId) : undefined
+  const viewerGens = viewerBatch ? successOf(viewerBatch) : []
+
+  return (
+    <div className="mx-auto max-w-6xl px-6 py-5">
+      <h1 className="mb-4 text-xl font-semibold">ギャラリー</h1>
+
+      {(batches ?? []).length === 0 ? (
+        <div className="rounded-lg border border-dashed border-ink-600 py-20 text-center text-ink-600">
+          まだ生成バッチがありません。「一括生成」から作成してください。
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {(batches ?? []).map((b) => {
+            const success = successOf(b)
+            return (
+              <section key={b.id} className="rounded-xl border border-ink-700 bg-ink-800/40 p-4">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <h2 className="text-sm font-semibold text-ink-100">{b.name}</h2>
+                  <span className="text-xs text-ink-500">
+                    {b.type === 'scene'
+                      ? `[${b.character_tag_name || '?'}] × ${b.story_name || '?'}`
+                      : `${b.character_name || '?'} × ${b.story_name || '?'}`}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] ${
+                      b.status === 'completed'
+                        ? 'bg-emerald-500/15 text-emerald-300'
+                        : b.status === 'failed'
+                          ? 'bg-red-500/15 text-red-300'
+                          : b.status === 'processing' || b.status === 'pending'
+                            ? 'bg-accent/15 text-accent'
+                            : 'bg-ink-700 text-ink-400'
+                    }`}
+                  >
+                    {STATUS_LABEL[b.status]} {b.done_count}/{b.total}
+                  </span>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    {success.length > 1 && (
+                      <button
+                        onClick={() => setViewer({ batchId: b.id, index: 0 })}
+                        className="rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent"
+                      >
+                        スライドショー
+                      </button>
+                    )}
+                    <button
+                      onClick={() => download(b)}
+                      disabled={success.length === 0 || downloading === b.id}
+                      className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+                    >
+                      <Download size={14} /> {downloading === b.id ? '保存中…' : 'ZIP DL'}
+                    </button>
+                    <button
+                      onClick={() => remove(b)}
+                      className="rounded-md p-1 text-ink-500 hover:text-red-300"
+                      title="削除"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+                  {b.generations.map((g) => (
+                    <GenCell
+                      key={g.id}
+                      g={g}
+                      retrying={retryingIds.includes(g.id)}
+                      onRetry={() => retry(g)}
+                      onOpen={() => {
+                        const i = success.findIndex((x) => x.id === g.id)
+                        setViewer({ batchId: b.id, index: Math.max(0, i) })
+                      }}
+                    />
+                  ))}
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      )}
+
+      {viewer && viewerGens.length > 0 && (
+        <GenerationViewer
+          generations={viewerGens}
+          index={Math.min(viewer.index, viewerGens.length - 1)}
+          onClose={() => setViewer(null)}
+          onChanged={mutate}
+        />
+      )}
+    </div>
+  )
+}

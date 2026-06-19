@@ -47,6 +47,15 @@ export function saveImage(logicalDir: string, buf: Buffer, ext = 'png'): string 
   return imageKey
 }
 
+// Persist a buffer at an EXACT logical key (dir + filename), building its
+// thumbnail. Used by batch generation where the filename follows a convention.
+export function saveImageWithName(logicalDir: string, filename: string, buf: Buffer): string {
+  const imageKey = posix.join(logicalDir, filename)
+  writeFileEnsured(storagePathFor(imageKey), buf)
+  makeThumbnail(buf, storagePathFor(thumbKey(imageKey)))
+  return imageKey
+}
+
 export function deleteImage(imageKey: string): void {
   for (const key of [imageKey, thumbKey(imageKey)]) {
     const abs = storagePathFor(key)
