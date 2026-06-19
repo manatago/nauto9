@@ -1,0 +1,12 @@
+node_modules/
+out/
+dist/
+.dev-data/
+*.log
+.DS_Store
+.env
+.env.*
+.smoke/
+.smoke-data/
+.dev-data.bak/
+*.tsbuildinfo
