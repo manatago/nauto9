@@ -27,6 +27,7 @@ const api: Api = {
     list: () => invoke('stories:list') as Promise<never>,
     create: (name) => invoke('stories:create', name) as Promise<never>,
     rename: (id, name) => invoke('stories:rename', id, name) as Promise<never>,
+    update: (id, patch) => invoke('stories:update', id, patch) as Promise<never>,
     delete: (id) => invoke('stories:delete', id) as Promise<never>,
     reorder: (ids) => invoke('stories:reorder', ids) as Promise<never>
   },
@@ -57,12 +58,15 @@ const api: Api = {
     create: (input) => invoke('batches:create', input) as Promise<never>,
     createScene: (input) => invoke('batches:createScene', input) as Promise<never>,
     delete: (id) => invoke('batches:delete', id) as Promise<never>,
-    download: (id) => invoke('batches:download', id) as Promise<never>
+    download: (id) => invoke('batches:download', id) as Promise<never>,
+    generateDialogues: (id) => invoke('batches:generateDialogues', id) as Promise<never>
   },
   generations: {
     regenerate: (id) => invoke('generations:regenerate', id) as Promise<never>,
     imageData: (id) => invoke('generations:imageData', id) as Promise<never>,
-    saveImage: (id, dataUrl) => invoke('generations:saveImage', id, dataUrl) as Promise<never>
+    saveImage: (id, dataUrl) => invoke('generations:saveImage', id, dataUrl) as Promise<never>,
+    generateDialogue: (id) => invoke('generations:generateDialogue', id) as Promise<never>,
+    setDialogue: (id, text) => invoke('generations:setDialogue', id, text) as Promise<never>
   },
   settings: {
     get: (key) => invoke('settings:get', key) as Promise<never>,

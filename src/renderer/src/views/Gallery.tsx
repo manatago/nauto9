@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, Loader2, Trash2, TriangleAlert } from 'lucide-react'
+import { Download, Loader2, MessageSquare, Trash2, TriangleAlert } from 'lucide-react'
 import type { Batch, BatchStatus, Generation } from '@shared/types'
 import { api, useBatches } from '../api'
 import { useToast } from '../components/Toast'
@@ -71,6 +71,15 @@ export default function Gallery(): JSX.Element {
     }
   }
 
+  async function genDialogues(b: Batch): Promise<void> {
+    try {
+      await api.batches.generateDialogues(b.id) // background; list polls for progress
+      mutate()
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
+  }
+
   async function remove(b: Batch): Promise<void> {
     if (!confirm(`バッチ「${b.name}」と生成画像を削除しますか？`)) return
     await api.batches.delete(b.id)
@@ -115,6 +124,14 @@ export default function Gallery(): JSX.Element {
                       ? `[${b.character_tag_name || '?'}] × ${b.story_name || '?'}`
                       : `${b.character_name || '?'} × ${b.story_name || '?'}`}
                   </span>
+                  {b.prefix_prompt && (
+                    <span
+                      className="max-w-[40%] truncate rounded bg-ink-700 px-1.5 py-0.5 text-[10px] text-ink-300"
+                      title={b.prefix_prompt}
+                    >
+                      先頭: {b.prefix_prompt}
+                    </span>
+                  )}
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] ${
                       b.status === 'completed'
@@ -137,6 +154,16 @@ export default function Gallery(): JSX.Element {
                         スライドショー
                       </button>
                     )}
+                    <button
+                      onClick={() => genDialogues(b)}
+                      disabled={success.length === 0 || b.dialogue_running}
+                      className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+                    >
+                      <MessageSquare size={14} />{' '}
+                      {b.dialogue_running
+                        ? `生成中 ${b.dialogue_count}/${success.length}`
+                        : 'セリフ一括生成'}
+                    </button>
                     <button
                       onClick={() => download(b)}
                       disabled={success.length === 0 || downloading === b.id}

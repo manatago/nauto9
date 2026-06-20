@@ -126,6 +126,79 @@ function ReferenceSettings(): JSX.Element {
   )
 }
 
+const LLM_KEYS = {
+  OLLAMA_URL: 'http://localhost:11434',
+  OLLAMA_MODEL: '',
+  DIALOGUE_PROMPT_TEMPLATE: ''
+} as const
+
+function LlmSettings(): JSX.Element {
+  const toast = useToast()
+  const [vals, setVals] = useState<Record<string, string>>({})
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    const keys = Object.keys(LLM_KEYS) as (keyof typeof LLM_KEYS)[]
+    Promise.all(keys.map((k) => api.settings.get(k))).then((got) => {
+      const next: Record<string, string> = {}
+      keys.forEach((k, i) => (next[k] = got[i] ?? LLM_KEYS[k]))
+      setVals(next)
+      setLoaded(true)
+    })
+  }, [])
+
+  const save = (key: string, value: string): void => {
+    setVals((s) => ({ ...s, [key]: value }))
+    api.settings.set(key, value).then(() => toast.success('保存しました'))
+  }
+
+  if (!loaded) return <section />
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold text-ink-300">文章生成（ローカルLLM / Ollama）</h2>
+      <p className="text-xs text-ink-600">
+        画像ごとのセリフをローカルの Ollama で生成します。`ollama serve` を起動し、使うモデルを pull しておいてください。
+      </p>
+      <div className="grid grid-cols-2 gap-3 sm:max-w-lg">
+        <label className="block">
+          <span className="mb-1 block text-xs text-ink-500">エンドポイント URL</span>
+          <input
+            defaultValue={vals.OLLAMA_URL}
+            onBlur={(e) => e.target.value !== vals.OLLAMA_URL && save('OLLAMA_URL', e.target.value)}
+            placeholder="http://localhost:11434"
+            className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-ink-500">モデル名</span>
+          <input
+            defaultValue={vals.OLLAMA_MODEL}
+            onBlur={(e) => e.target.value !== vals.OLLAMA_MODEL && save('OLLAMA_MODEL', e.target.value)}
+            placeholder="例: ninja-nsfw-rp（日本語RP推奨）"
+            className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
+          />
+        </label>
+      </div>
+      <label className="block sm:max-w-lg">
+        <span className="mb-1 block text-xs text-ink-500">
+          セリフ用プロンプトテンプレ（空欄なら既定。使える差し込み: {'{character} {traits} {story} {story_desc} {situation}'}）
+        </span>
+        <textarea
+          defaultValue={vals.DIALOGUE_PROMPT_TEMPLATE}
+          onBlur={(e) =>
+            e.target.value !== vals.DIALOGUE_PROMPT_TEMPLATE &&
+            save('DIALOGUE_PROMPT_TEMPLATE', e.target.value)
+          }
+          rows={4}
+          placeholder="空欄なら既定テンプレ（キャラ／特徴／物語／状況からセリフ1行を生成）を使用"
+          className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60"
+        />
+      </label>
+    </section>
+  )
+}
+
 export default function Settings(): JSX.Element {
   const toast = useToast()
   const [token, setToken] = useState('')
@@ -169,6 +242,7 @@ export default function Settings(): JSX.Element {
       </section>
 
       <ReferenceSettings />
+      <LlmSettings />
     </div>
   )
 }

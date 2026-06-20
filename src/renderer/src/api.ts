@@ -51,7 +51,11 @@ export function useSituationTags(): { data: Tag[] | undefined; mutate: Revalidat
 export function useBatches(): { data: Batch[] | undefined; mutate: Revalidate } {
   const { data, mutate } = useSWR<Batch[]>('batches', () => api.batches.list(), {
     refreshInterval: (latest) =>
-      latest?.some((b) => b.status === 'processing' || b.status === 'pending') ? 1500 : 0
+      latest?.some(
+        (b) => b.status === 'processing' || b.status === 'pending' || b.dialogue_running
+      )
+        ? 1500
+        : 0
   })
   return { data, mutate: () => mutate() }
 }

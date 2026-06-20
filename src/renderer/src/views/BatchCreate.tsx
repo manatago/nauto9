@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Play, Wand2 } from 'lucide-react'
+import { Check, Play, Wand2 } from 'lucide-react'
 import { api, useBatches, useCharacters, useSituations, useStories, useTags } from '../api'
 import { useToast } from '../components/Toast'
 import CharacterPicker from '../components/CharacterPicker'
@@ -23,6 +23,7 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
   const [tagId, setTagId] = useState<number | null>(null)
   const [selectedSits, setSelectedSits] = useState<number[]>([])
   const [name, setName] = useState('')
+  const [prefix, setPrefix] = useState('')
   const [starting, setStarting] = useState(false)
 
   const { data: situations } = useSituations(mode === 'scene' ? storyId : null)
@@ -46,14 +47,20 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
     try {
       if (mode === 'story') {
         if (!storyCanStart) return
-        await api.batches.create({ character_id: characterId!, story_id: storyId!, name: name.trim() })
+        await api.batches.create({
+          character_id: characterId!,
+          story_id: storyId!,
+          name: name.trim(),
+          prefix_prompt: prefix.trim()
+        })
       } else {
         if (!sceneCanStart) return
         await api.batches.createScene({
           story_id: storyId!,
           situation_ids: selectedSits,
           character_tag_id: tagId!,
-          name: name.trim()
+          name: name.trim(),
+          prefix_prompt: prefix.trim()
         })
       }
       mutateBatches()
@@ -149,30 +156,51 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
                       : '全選択'}
                   </button>
                 </div>
-                <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-ink-700 bg-ink-900/40 p-2">
-                  {(situations ?? []).length === 0 ? (
-                    <div className="px-1 py-2 text-xs text-ink-600">シチュエーションがありません</div>
-                  ) : (
-                    (situations ?? []).map((s) => {
+                {(situations ?? []).length === 0 ? (
+                  <div className="rounded-md border border-ink-700 bg-ink-900/40 px-2 py-3 text-xs text-ink-600">
+                    シチュエーションがありません
+                  </div>
+                ) : (
+                  <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto rounded-md border border-ink-700 bg-ink-900/40 p-2 sm:grid-cols-4">
+                    {(situations ?? []).map((s) => {
                       const on = selectedSits.includes(s.id)
                       return (
-                        <label key={s.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-ink-800">
-                          <input
-                            type="checkbox"
-                            checked={on}
-                            onChange={() =>
-                              setSelectedSits((ids) =>
-                                on ? ids.filter((x) => x !== s.id) : [...ids, s.id]
-                              )
-                            }
-                          />
-                          <span className="truncate text-ink-200">{s.name || '（無題）'}</span>
-                          <span className="ml-auto shrink-0 text-[10px] text-ink-500">{s.aspect_ratio}</span>
-                        </label>
+                        <button
+                          key={s.id}
+                          onClick={() =>
+                            setSelectedSits((ids) =>
+                              on ? ids.filter((x) => x !== s.id) : [...ids, s.id]
+                            )
+                          }
+                          className={`group relative aspect-[3/4] overflow-hidden rounded-lg border ${
+                            on ? 'border-accent ring-2 ring-accent/60' : 'border-ink-700 hover:border-ink-500'
+                          }`}
+                        >
+                          {s.preview_image_url ? (
+                            <img
+                              src={s.preview_image_url}
+                              className={`absolute inset-0 h-full w-full object-cover ${on ? '' : 'opacity-90 group-hover:opacity-100'}`}
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center p-2 text-center text-[10px] leading-snug text-ink-600">
+                              {s.prompt || s.name || '（未設定）'}
+                            </div>
+                          )}
+                          {on && (
+                            <div className="absolute right-1 top-1 rounded-full bg-accent p-0.5 text-ink-900">
+                              <Check size={12} />
+                            </div>
+                          )}
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-900/90 to-transparent p-1.5 pt-5">
+                            <span className="block truncate text-[10px] text-ink-50">
+                              {s.name || '（無題）'}
+                            </span>
+                          </div>
+                        </button>
                       )
-                    })
-                  )}
-                </div>
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -203,6 +231,19 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
             </div>
           </>
         )}
+
+        <label className="block">
+          <span className="mb-1 block text-xs text-ink-500">
+            共通プロンプト（任意・各シチュプロンプトの先頭に付与）
+          </span>
+          <textarea
+            value={prefix}
+            onChange={(e) => setPrefix(e.target.value)}
+            rows={2}
+            placeholder="例: masterpiece, best quality, 8k"
+            className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60"
+          />
+        </label>
 
         <label className="block">
           <span className="mb-1 block text-xs text-ink-500">バッチ名（任意）</span>

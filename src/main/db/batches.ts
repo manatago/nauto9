@@ -23,6 +23,7 @@ function toGeneration(r: Row): Generation {
     seq: r.seq as number,
     situation_name: r.situation_name as string,
     character_name: (r.character_name as string) ?? '',
+    dialogue: (r.dialogue as string) ?? '',
     image_path: path,
     image_url: mediaUrlOrNull(path),
     thumbnail_url: thumbUrlOrNull(path),
@@ -40,10 +41,19 @@ function generationsForBatch(batchId: number): Generation[] {
   ).map(toGeneration)
 }
 
+// Batches whose dialogue generation is running in the background (in-memory;
+// drives renderer polling). Set by the dialogue worker.
+const dialogueRunning = new Set<number>()
+export function setDialogueRunning(id: number, on: boolean): void {
+  if (on) dialogueRunning.add(id)
+  else dialogueRunning.delete(id)
+}
+
 function toBatch(r: Row): Batch {
-  const gens = generationsForBatch(r.id as number)
+  const id = r.id as number
+  const gens = generationsForBatch(id)
   return {
-    id: r.id as number,
+    id,
     name: r.name as string,
     type: (r.type as BatchType) ?? 'story',
     character_id: (r.character_id as number | null) ?? null,
@@ -52,10 +62,13 @@ function toBatch(r: Row): Batch {
     character_name: r.character_name as string,
     story_name: r.story_name as string,
     character_tag_name: (r.character_tag_name as string) ?? '',
+    prefix_prompt: (r.prefix_prompt as string) ?? '',
     status: r.status as BatchStatus,
     total: r.total as number,
     done_count: gens.filter((g) => g.status !== 'pending').length,
     success_count: gens.filter((g) => g.status === 'success').length,
+    dialogue_running: dialogueRunning.has(id),
+    dialogue_count: gens.filter((g) => g.dialogue.trim().length > 0).length,
     created_at: r.created_at as string,
     updated_at: r.updated_at as string,
     generations: gens
@@ -94,10 +107,11 @@ export function createBatch(input: BatchCreateInput): Batch {
   const tx = db.transaction(() => {
     const batchId = db
       .prepare(
-        `INSERT INTO batches (name, type, character_id, story_id, character_name, story_name, status, total)
-         VALUES (?, 'story', ?, ?, ?, ?, 'pending', ?)`
+        `INSERT INTO batches (name, type, character_id, story_id, character_name, story_name, prefix_prompt, status, total)
+         VALUES (?, 'story', ?, ?, ?, ?, ?, 'pending', ?)`
       )
-      .run(name, ch.id, st.id, ch.name, st.name, sits.length).lastInsertRowid as number
+      .run(name, ch.id, st.id, ch.name, st.name, input.prefix_prompt?.trim() ?? '', sits.length)
+      .lastInsertRowid as number
     const ins = db.prepare(
       `INSERT INTO generations (batch_id, situation_id, character_id, seq, situation_name, character_name)
        VALUES (?, ?, ?, ?, ?, ?)`
@@ -132,10 +146,11 @@ export function createSceneBatch(input: SceneBatchCreateInput): Batch {
   const tx = db.transaction(() => {
     const batchId = db
       .prepare(
-        `INSERT INTO batches (name, type, story_id, character_tag_id, story_name, character_tag_name, status, total)
-         VALUES (?, 'scene', ?, ?, ?, ?, 'pending', ?)`
+        `INSERT INTO batches (name, type, story_id, character_tag_id, story_name, character_tag_name, prefix_prompt, status, total)
+         VALUES (?, 'scene', ?, ?, ?, ?, ?, 'pending', ?)`
       )
-      .run(name, st.id, tag.id, st.name, tag.name, sits.length * chars.length).lastInsertRowid as number
+      .run(name, st.id, tag.id, st.name, tag.name, input.prefix_prompt?.trim() ?? '', sits.length * chars.length)
+      .lastInsertRowid as number
     const ins = db.prepare(
       `INSERT INTO generations (batch_id, situation_id, character_id, seq, situation_name, character_name)
        VALUES (?, ?, ?, ?, ?, ?)`
@@ -164,12 +179,13 @@ export interface BatchRow {
   id: number
   name: string
   character_id: number | null
+  prefix_prompt: string
   status: BatchStatus
 }
 
 export function getBatchRow(id: number): BatchRow | null {
   const r = getDb()
-    .prepare('SELECT id, name, character_id, status FROM batches WHERE id = ?')
+    .prepare('SELECT id, name, character_id, prefix_prompt, status FROM batches WHERE id = ?')
     .get(id) as BatchRow | undefined
   return r ?? null
 }
@@ -250,13 +266,14 @@ export interface GenerationRow {
   character_id: number | null
   seq: number
   situation_name: string
+  character_name: string
   image_path: string | null
 }
 
 export function getGenerationRow(id: number): GenerationRow | null {
   const r = getDb()
     .prepare(
-      'SELECT id, batch_id, situation_id, character_id, seq, situation_name, image_path FROM generations WHERE id = ?'
+      'SELECT id, batch_id, situation_id, character_id, seq, situation_name, character_name, image_path FROM generations WHERE id = ?'
     )
     .get(id) as GenerationRow | undefined
   return r ?? null
@@ -265,6 +282,19 @@ export function getGenerationRow(id: number): GenerationRow | null {
 export function getGeneration(id: number): Generation | null {
   const r = getDb().prepare('SELECT * FROM generations WHERE id = ?').get(id) as Row | undefined
   return r ? toGeneration(r) : null
+}
+
+export function setDialogue(id: number, text: string): void {
+  getDb().prepare('UPDATE generations SET dialogue = ? WHERE id = ?').run(text, id)
+}
+
+// Success generations of a batch in order — for dialogue generation / posting.
+export function successGenerationIds(batchId: number): number[] {
+  return (
+    getDb()
+      .prepare("SELECT id FROM generations WHERE batch_id = ? AND status = 'success' ORDER BY seq, id")
+      .all(batchId) as { id: number }[]
+  ).map((r) => r.id)
 }
 
 // Replace a generation's image with a new file, deleting the old one.

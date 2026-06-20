@@ -17,6 +17,7 @@ export function listStories(): Story[] {
   return (db.prepare('SELECT * FROM stories ORDER BY order_index, id').all() as Row[]).map((r) => ({
     id: r.id as number,
     name: r.name as string,
+    description: (r.description as string) ?? '',
     order_index: r.order_index as number,
     situation_count: (
       db.prepare('SELECT COUNT(*) AS n FROM situations WHERE story_id = ?').get(r.id) as { n: number }
@@ -40,6 +41,26 @@ export function renameStory(id: number, patchOrName: string | StoryUpdateInput):
   const name = typeof patchOrName === 'string' ? patchOrName : (patchOrName.name ?? '')
   getDb().prepare('UPDATE stories SET name = ? WHERE id = ?').run(name.trim(), id)
   return listStories().find((s) => s.id === id)!
+}
+
+export function updateStory(id: number, patch: StoryUpdateInput): Story {
+  const db = getDb()
+  if (patch.name !== undefined)
+    db.prepare('UPDATE stories SET name = ? WHERE id = ?').run(patch.name.trim(), id)
+  if (patch.description !== undefined)
+    db.prepare('UPDATE stories SET description = ? WHERE id = ?').run(patch.description, id)
+  return listStories().find((s) => s.id === id)!
+}
+
+// Resolve a story's name + description from a situation (for dialogue context).
+export function storyForSituation(situationId: number): { name: string; description: string } | null {
+  const r = getDb()
+    .prepare(
+      `SELECT st.name, st.description FROM situations s
+       JOIN stories st ON st.id = s.story_id WHERE s.id = ?`
+    )
+    .get(situationId) as { name: string; description: string } | undefined
+  return r ?? null
 }
 
 export function deleteStory(id: number): void {

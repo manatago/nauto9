@@ -14,6 +14,7 @@ import * as repo from '../db/repo'
 import * as sit from '../db/situations'
 import * as batchRepo from '../db/batches'
 import { enqueueBatch, regenerateGeneration } from '../services/batch'
+import { enqueueDialogues, generateDialogueForGeneration } from '../services/dialogue'
 import { generateImage } from '../services/novelai'
 import { buildReferenceParams, referenceMode } from '../services/reference'
 import { decodeDataUrl, mediaUrl, saveImage, saveImageWithName, thumbKey } from '../services/images'
@@ -70,6 +71,7 @@ export function registerIpc(): void {
   handle('stories:list', () => sit.listStories())
   handle('stories:create', (name: string) => sit.createStory(name))
   handle('stories:rename', (id: number, name: string) => sit.renameStory(id, name))
+  handle('stories:update', (id: number, patch) => sit.updateStory(id, patch))
   handle('stories:delete', (id: number) => sit.deleteStory(id))
   handle('stories:reorder', (ids: number[]) => sit.reorderStories(ids))
 
@@ -133,6 +135,9 @@ export function registerIpc(): void {
     return b
   })
   handle('batches:delete', (id: number) => batchRepo.deleteBatch(id))
+  handle('batches:generateDialogues', (id: number) => {
+    enqueueDialogues(id) // background; renderer polls list for progress
+  })
   ipcMain.handle('batches:download', async (e, batchId: number) => {
     const paths = batchRepo.successImagePaths(batchId)
     if (!paths.length) throw new Error('保存できる画像がありません')
@@ -176,12 +181,20 @@ export function registerIpc(): void {
     const buf = readFileSync(storagePathFor(g.image_path))
     return `data:image/png;base64,${buf.toString('base64')}`
   })
+  handle('generations:generateDialogue', async (id: number) => {
+    await generateDialogueForGeneration(id)
+    return batchRepo.getGeneration(id)
+  })
+  handle('generations:setDialogue', (id: number, text: string) => {
+    batchRepo.setDialogue(id, text)
+    return batchRepo.getGeneration(id)
+  })
   handle('generations:saveImage', (id: number, dataUrl: string) => {
     const g = batchRepo.getGenerationRow(id)
     if (!g) throw new Error('生成が見つかりません')
     const name = batchRepo.batchName(g.batch_id) ?? 'batch'
     const { buf } = decodeDataUrl(dataUrl)
-    const key = generationKey(name, g.seq, g.situation_name)
+    const key = generationKey(name, g.seq, replaceXxx(g.situation_name, g.character_name))
     saveImageWithName(posix.dirname(key), posix.basename(key), buf)
     batchRepo.setGenerationImage(id, key)
     return batchRepo.getGeneration(id)

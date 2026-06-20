@@ -22,6 +22,7 @@ export default function CharacterDetail({ characterId, onBack }: Props): JSX.Ele
   const [prompt, setPrompt] = useState('')
   const [neg, setNeg] = useState('')
   const [memo, setMemo] = useState('')
+  const [persona, setPersona] = useState('')
   const [tagIds, setTagIds] = useState<number[]>([])
   const [replacements, setReplacements] = useState<PromptReplacement[]>([])
   const [preview, setPreview] = useState<{
@@ -37,6 +38,7 @@ export default function CharacterDetail({ characterId, onBack }: Props): JSX.Ele
     setPrompt(character.prompt)
     setNeg(character.negative_prompt)
     setMemo(character.memo)
+    setPersona(character.persona)
     setTagIds(character.tags.map((t) => t.id))
     setReplacements(character.prompt_replacements)
   }, [character])
@@ -51,6 +53,7 @@ export default function CharacterDetail({ characterId, onBack }: Props): JSX.Ele
       prompt,
       negative_prompt: neg,
       memo,
+      persona,
       tag_ids: tagIds,
       prompt_replacements: replacements.filter((r) => r.find.trim()),
       ...overrides
@@ -166,7 +169,21 @@ export default function CharacterDetail({ characterId, onBack }: Props): JSX.Ele
           />
 
           <label className="block">
-            <span className="mb-1 block text-xs text-ink-500">メモ</span>
+            <span className="mb-1 block text-xs text-ink-500">
+              性格・口調（セリフ生成に使用）
+            </span>
+            <textarea
+              value={persona}
+              onChange={(e) => setPersona(e.target.value)}
+              onBlur={saveBase}
+              rows={4}
+              placeholder="例: 内気でぶっきらぼう。一人称は「あたし」。早口で「〜じゃない」「べつに」が口癖。素直になれず照れると強がる。"
+              className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs text-ink-500">メモ（任意）</span>
             <textarea
               value={memo}
               onChange={(e) => setMemo(e.target.value)}

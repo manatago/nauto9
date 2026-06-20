@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom'
 import {
   ChevronLeft,
   ChevronRight,
+  Loader2,
   Pause,
+  Pencil,
   Play,
   RefreshCw,
   SquareDashedMousePointer,
@@ -80,6 +82,13 @@ export default function GenerationViewer({
   // Previous image data, kept only right after a regenerate (1-step undo).
   // Cleared on navigation / close.
   const [undoData, setUndoData] = useState<string | null>(null)
+  // Prompt editing (updates the source character & situation records).
+  const [editOpen, setEditOpen] = useState(false)
+  const [editLoading, setEditLoading] = useState(false)
+  const [charPrompt, setCharPrompt] = useState('')
+  const [sitPrompt, setSitPrompt] = useState('')
+  const [dialogue, setDialogue] = useState('')
+  const [dlgBusy, setDlgBusy] = useState(false) // separate so its spinner shows on the right button
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const dragRef = useRef<{ x: number; y: number } | null>(null)
 
@@ -97,6 +106,11 @@ export default function GenerationViewer({
     setUndoData(null)
   }, [idx])
 
+  // Keep the dialogue field synced with the current image (and after gen).
+  useEffect(() => {
+    setDialogue(cur?.dialogue ?? '')
+  }, [cur?.id, cur?.dialogue])
+
   // slideshow auto-advance
   useEffect(() => {
     if (!playing || mosaic) return
@@ -107,6 +121,9 @@ export default function GenerationViewer({
   // keyboard
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      // Don't hijack keys while typing in a prompt field (space, arrows, etc.).
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
       if (e.key === 'Escape') (mosaic ? setMosaic(false) : onClose())
       else if (e.key === 'ArrowRight') go(1)
       else if (e.key === 'ArrowLeft') go(-1)
@@ -139,6 +156,25 @@ export default function GenerationViewer({
       alive = false
     }
   }, [mosaic, cur])
+
+  // Load the current character / situation prompts when the editor opens.
+  useEffect(() => {
+    if (!editOpen || !cur) return
+    let alive = true
+    setEditLoading(true)
+    Promise.all([
+      cur.character_id ? api.characters.get(cur.character_id) : Promise.resolve(null),
+      cur.situation_id ? api.situations.get(cur.situation_id) : Promise.resolve(null)
+    ]).then(([c, s]) => {
+      if (!alive) return
+      setCharPrompt(c?.prompt ?? '')
+      setSitPrompt(s?.prompt ?? '')
+      setEditLoading(false)
+    })
+    return () => {
+      alive = false
+    }
+  }, [editOpen, cur?.id, cur?.character_id, cur?.situation_id])
 
   if (!cur) return null
 
@@ -200,6 +236,47 @@ export default function GenerationViewer({
     } finally {
       setBusy(false)
     }
+  }
+
+  // Persist edited prompts back to the source character & situation records,
+  // then optionally regenerate this image with the updated prompts.
+  async function saveEdits(thenRegen: boolean): Promise<void> {
+    setBusy(true)
+    try {
+      if (cur.character_id) await api.characters.update(cur.character_id, { prompt: charPrompt })
+      if (cur.situation_id) await api.situations.update(cur.situation_id, { prompt: sitPrompt })
+      if (thenRegen) {
+        const prev = await api.generations.imageData(cur.id)
+        await api.generations.regenerate(cur.id)
+        onChanged()
+        setUndoData(prev)
+        toast.success('更新して再生成しました')
+      } else {
+        toast.success('プロンプトを更新しました')
+      }
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function genDialogue(): Promise<void> {
+    setDlgBusy(true)
+    try {
+      await api.generations.generateDialogue(cur.id)
+      onChanged()
+      toast.success('セリフを生成しました')
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setDlgBusy(false)
+    }
+  }
+
+  function saveDialogue(): void {
+    if (dialogue === (cur.dialogue ?? '')) return
+    api.generations.setDialogue(cur.id, dialogue).then(() => onChanged())
   }
 
   async function saveMosaic(): Promise<void> {
@@ -264,6 +341,85 @@ export default function GenerationViewer({
         )}
       </div>
 
+      {/* per-image dialogue (local LLM) */}
+      {!mosaic && (
+        <div className="flex items-center gap-2 border-t border-ink-700 bg-ink-900/80 px-6 py-2">
+          <span className="shrink-0 text-xs text-ink-500">セリフ</span>
+          <input
+            value={dialogue}
+            onChange={(e) => setDialogue(e.target.value)}
+            onBlur={saveDialogue}
+            placeholder="未生成 —「生成」で作成（手入力も可）"
+            className="flex-1 rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
+          />
+          <button
+            onClick={genDialogue}
+            disabled={busy || dlgBusy}
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:bg-white/10 disabled:opacity-50"
+          >
+            {dlgBusy ? <Loader2 size={14} className="animate-spin" /> : null}
+            {dlgBusy ? '生成中…' : cur.dialogue ? '再生成' : '生成'}
+          </button>
+        </div>
+      )}
+
+      {/* prompt editor (updates the source character & situation) */}
+      {editOpen && !mosaic && (
+        <div className="border-t border-ink-700 bg-ink-900/95 px-6 py-3">
+          {editLoading ? (
+            <div className="py-2 text-xs text-ink-500">読み込み中…</div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-xs text-ink-500">
+                  キャラクタープロンプト
+                  {!cur.character_id && '（キャラ削除済み・編集不可）'}
+                </span>
+                <textarea
+                  value={charPrompt}
+                  onChange={(e) => setCharPrompt(e.target.value)}
+                  disabled={!cur.character_id}
+                  rows={3}
+                  className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60 disabled:opacity-50"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs text-ink-500">
+                  シチュエーションプロンプト
+                  {!cur.situation_id && '（シチュ削除済み・編集不可）'}
+                </span>
+                <textarea
+                  value={sitPrompt}
+                  onChange={(e) => setSitPrompt(e.target.value)}
+                  disabled={!cur.situation_id}
+                  rows={3}
+                  className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60 disabled:opacity-50"
+                />
+              </label>
+            </div>
+          )}
+          <div className="mt-2 flex items-center gap-2">
+            <span className="mr-auto text-[11px] text-ink-600">
+              元のキャラ／シチュのプロンプトを更新します（他の生成にも反映されます）
+            </span>
+            <button
+              onClick={() => saveEdits(false)}
+              disabled={busy || editLoading}
+              className="rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:bg-white/10 disabled:opacity-50"
+            >
+              保存
+            </button>
+            <button
+              onClick={() => saveEdits(true)}
+              disabled={busy || editLoading}
+              className="rounded-md bg-accent/20 px-3 py-1.5 text-sm text-accent ring-1 ring-accent/50 hover:bg-accent/30 disabled:opacity-50"
+            >
+              保存して再生成
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* controls */}
       <div className="flex items-center justify-center gap-2 px-4 py-3">
         {mosaic ? (
@@ -299,6 +455,14 @@ export default function GenerationViewer({
             >
               <RefreshCw size={15} className={busy ? 'animate-spin' : ''} /> 再生成
             </button>
+            <button
+              onClick={() => setEditOpen((o) => !o)}
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-white/10 ${
+                editOpen ? 'border-accent/50 text-accent' : 'border-ink-600 text-ink-200'
+              }`}
+            >
+              <Pencil size={15} /> プロンプト編集
+            </button>
             {undoData && (
               <button
                 onClick={undo}
@@ -311,6 +475,7 @@ export default function GenerationViewer({
             <button
               onClick={() => {
                 setPlaying(false)
+                setEditOpen(false)
                 setMosaic(true)
               }}
               className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:bg-white/10"

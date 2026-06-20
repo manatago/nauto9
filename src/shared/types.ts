@@ -32,6 +32,7 @@ export interface Character {
   negative_prompt: string
   prompt_replacements: PromptReplacement[]
   memo: string
+  persona: string // personality / speech style — fed to the LLM for dialogue
   tags: Tag[]
   images: CharacterImage[]
   created_at: string
@@ -62,6 +63,7 @@ export type AspectRatio = 'portrait' | 'square' | 'landscape'
 export interface Story {
   id: number
   name: string
+  description: string // story setting/context (fed to the LLM for dialogue)
   order_index: number
   situation_count: number
   created_at: string
@@ -84,6 +86,7 @@ export interface Situation {
 
 export interface StoryUpdateInput {
   name?: string
+  description?: string
 }
 
 // ---- batches & generations ----
@@ -100,6 +103,7 @@ export interface Generation {
   seq: number
   situation_name: string
   character_name: string
+  dialogue: string // LLM-generated line the character says in this scene
   image_path: string | null
   image_url: string | null
   thumbnail_url: string | null
@@ -118,10 +122,13 @@ export interface Batch {
   character_name: string
   story_name: string
   character_tag_name: string
+  prefix_prompt: string // prepended to every situation prompt in this batch
   status: BatchStatus
   total: number
   done_count: number
   success_count: number
+  dialogue_running: boolean // dialogue generation in progress (background)
+  dialogue_count: number // generations that already have a dialogue line
   created_at: string
   updated_at: string
   generations: Generation[]
@@ -132,6 +139,7 @@ export interface BatchCreateInput {
   character_id: number
   story_id: number
   name?: string
+  prefix_prompt?: string
 }
 
 // "scene" batch: selected situations × every character carrying a tag.
@@ -140,6 +148,7 @@ export interface SceneBatchCreateInput {
   situation_ids: number[]
   character_tag_id: number
   name?: string
+  prefix_prompt?: string
 }
 
 export interface SituationCreateInput {
@@ -168,6 +177,7 @@ export interface CharacterCreateInput {
   negative_prompt?: string
   prompt_replacements?: PromptReplacement[]
   memo?: string
+  persona?: string
   tag_ids?: number[]
 }
 
@@ -177,6 +187,7 @@ export interface CharacterUpdateInput {
   negative_prompt?: string
   prompt_replacements?: PromptReplacement[]
   memo?: string
+  persona?: string
   tag_ids?: number[]
 }
 
@@ -213,6 +224,7 @@ export interface Api {
     list(): Promise<Story[]>
     create(name: string): Promise<Story>
     rename(id: number, name: string): Promise<Story>
+    update(id: number, patch: StoryUpdateInput): Promise<Story> // name / description
     delete(id: number): Promise<void>
     reorder(ids: number[]): Promise<void>
   }
@@ -248,11 +260,14 @@ export interface Api {
     createScene(input: SceneBatchCreateInput): Promise<Batch> // scene × tag type
     delete(id: number): Promise<void>
     download(id: number): Promise<{ saved: string | null }> // ZIP via save dialog
+    generateDialogues(id: number): Promise<void> // background; poll list for progress
   }
   generations: {
     regenerate(id: number): Promise<Generation> // re-run the same character × situation
     imageData(id: number): Promise<string> // data: URL (clean for canvas editing)
     saveImage(id: number, dataUrl: string): Promise<Generation> // save edited (mosaic) image
+    generateDialogue(id: number): Promise<Generation> // LLM line for one image
+    setDialogue(id: number, text: string): Promise<Generation> // manual edit
   }
   settings: {
     get(key: string): Promise<string | null>

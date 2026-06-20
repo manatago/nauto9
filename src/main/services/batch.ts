@@ -26,9 +26,14 @@ async function generateAndSave(
   situation: Situation,
   seq: number,
   situationName: string,
-  token: string
+  token: string,
+  prefixPrompt: string
 ): Promise<string> {
-  let scene = replaceXxx(situation.prompt, char.name)
+  // Batch-wide prefix prepended to the situation prompt for every generation.
+  const base = prefixPrompt.trim()
+    ? `${prefixPrompt.trim()}, ${situation.prompt}`
+    : situation.prompt
+  let scene = replaceXxx(base, char.name)
   scene = applyCharacterReplacements(scene, char.prompt_replacements)
   const negative = [situation.negative_prompt, char.negative_prompt]
     .map((x) => x.trim())
@@ -43,7 +48,8 @@ async function generateAndSave(
     aspect: situation.aspect_ratio,
     reference: ref?.params
   })
-  const key = generationKey(batchName, seq, situationName)
+  // xxx in the situation name -> character name in the filename too.
+  const key = generationKey(batchName, seq, replaceXxx(situationName, char.name))
   saveImageWithName(posix.dirname(key), posix.basename(key), png)
   return key
 }
@@ -59,7 +65,7 @@ export async function regenerateGeneration(genId: number): Promise<void> {
   if (!char) throw new Error('キャラクターが見つかりません（削除された可能性）')
   if (!s) throw new Error('シチュエーションが見つかりません（削除された可能性）')
   const token = repo.getSetting('NOVELAI_API_TOKEN') ?? ''
-  const key = await generateAndSave(b.name, char, s, g.seq, g.situation_name, token)
+  const key = await generateAndSave(b.name, char, s, g.seq, g.situation_name, token, b.prefix_prompt)
   batches.setGenerationImage(genId, key)
 }
 
@@ -108,7 +114,7 @@ async function processBatch(batchId: number): Promise<void> {
       if (!char) throw new Error('キャラクターが見つかりません（削除された可能性）')
       const s = g.situation_id ? sit.getSituation(g.situation_id) : null
       if (!s) throw new Error('シチュエーションが見つかりません')
-      const key = await generateAndSave(b.name, char, s, g.seq, g.situation_name, token)
+      const key = await generateAndSave(b.name, char, s, g.seq, g.situation_name, token, b.prefix_prompt)
       batches.setGenerationResult(g.id, key)
     } catch (e) {
       batches.setGenerationFailed(g.id, (e as Error).message)

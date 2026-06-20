@@ -128,6 +128,21 @@ export default function Situations(): JSX.Element {
           )}
         </div>
 
+        {storyId !== null && (
+          <textarea
+            key={storyId}
+            defaultValue={stories?.find((s) => s.id === storyId)?.description ?? ''}
+            onBlur={(e) => {
+              const cur = stories?.find((s) => s.id === storyId)?.description ?? ''
+              if (e.target.value !== cur)
+                api.stories.update(storyId, { description: e.target.value }).then(() => mutateStories())
+            }}
+            rows={2}
+            placeholder="ストーリーの設定・あらすじ（任意・セリフ生成の文脈に使われます）"
+            className="mb-3 w-full resize-y rounded-md border border-ink-700 bg-ink-900/50 px-3 py-2 text-xs text-ink-300 outline-none focus:border-accent/60"
+          />
+        )}
+
         {/* tag cross-cut filter */}
         {(tags ?? []).length > 0 && (
           <div className="mb-3 flex flex-wrap items-center gap-1.5">

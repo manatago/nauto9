@@ -3,7 +3,7 @@ import { rmSync } from 'fs'
 import { join } from 'path'
 import { storageRoot } from '../paths'
 
-const SCHEMA_VERSION = 8
+const SCHEMA_VERSION = 11
 
 // Simple model: a character is a single prompt + tags + reference images.
 // (The earlier clothing/state/outfit layer was removed — make separate
@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS characters (
   negative_prompt TEXT NOT NULL DEFAULT '',
   prompt_replacements TEXT NOT NULL DEFAULT '[]',
   memo TEXT NOT NULL DEFAULT '',
+  persona TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -53,6 +54,7 @@ CREATE TABLE IF NOT EXISTS settings (
 CREATE TABLE IF NOT EXISTS stories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
   order_index INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -94,6 +96,7 @@ CREATE TABLE IF NOT EXISTS batches (
   character_name TEXT NOT NULL DEFAULT '',
   story_name TEXT NOT NULL DEFAULT '',
   character_tag_name TEXT NOT NULL DEFAULT '',
+  prefix_prompt TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',
   total INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -108,6 +111,7 @@ CREATE TABLE IF NOT EXISTS generations (
   seq INTEGER NOT NULL,
   situation_name TEXT NOT NULL DEFAULT '',
   character_name TEXT NOT NULL DEFAULT '',
+  dialogue TEXT NOT NULL DEFAULT '',
   image_path TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   error TEXT,
@@ -190,6 +194,16 @@ export function migrate(db: Database.Database): void {
         character_name = COALESCE((SELECT character_name FROM batches b WHERE b.id = generations.batch_id), '')
       WHERE character_id IS NULL
     `)
+  }
+  if (v < 9) {
+    addColumnIfMissing(db, 'batches', 'prefix_prompt', "TEXT NOT NULL DEFAULT ''")
+  }
+  if (v < 10) {
+    addColumnIfMissing(db, 'stories', 'description', "TEXT NOT NULL DEFAULT ''")
+    addColumnIfMissing(db, 'generations', 'dialogue', "TEXT NOT NULL DEFAULT ''")
+  }
+  if (v < 11) {
+    addColumnIfMissing(db, 'characters', 'persona', "TEXT NOT NULL DEFAULT ''")
   }
 
   db.pragma(`user_version = ${SCHEMA_VERSION}`)

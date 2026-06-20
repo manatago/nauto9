@@ -1,0 +1,21 @@
+# Ninja-v1-NSFW-RP — Japanese roleplay model used for per-image dialogue.
+#
+# The raw GGUF from HuggingFace ships with NO chat template (TEMPLATE
+# "{{ .Prompt }}"), so Ollama's /api/chat just echoes the messages back. This
+# model is Mistral-7B based and expects the [INST] … [/INST] format. This
+# Modelfile registers that template so the app's /api/chat (system + user)
+# renders correctly.
+#
+# Setup (one time):
+#   ollama pull hf.co/mradermacher/Ninja-v1-NSFW-RP-i1-GGUF:i1-Q4_K_M
+#   ollama cp   hf.co/mradermacher/Ninja-v1-NSFW-RP-i1-GGUF:i1-Q4_K_M ninja-nsfw-rp
+#   ollama create ninja-nsfw-rp -f models/Ninja-v1-NSFW-RP.Modelfile
+# Then set Settings → モデル名 = ninja-nsfw-rp
+
+FROM ninja-nsfw-rp
+TEMPLATE """[INST] {{ if .System }}{{ .System }}
+
+{{ end }}{{ .Prompt }} [/INST] """
+PARAMETER stop "[/INST]"
+PARAMETER stop "[INST]"
+PARAMETER stop "</s>"

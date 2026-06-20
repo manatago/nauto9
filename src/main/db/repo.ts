@@ -104,6 +104,7 @@ export function getCharacter(id: number): Character | null {
     negative_prompt: r.negative_prompt as string,
     prompt_replacements: parseReplacements(r.prompt_replacements as string),
     memo: r.memo as string,
+    persona: (r.persona as string) ?? '',
     tags: tagsForCharacter(id),
     images: imagesForCharacter(id),
     created_at: r.created_at as string,
@@ -123,15 +124,16 @@ export function createCharacter(input: CharacterCreateInput): Character {
   const tx = db.transaction(() => {
     const id = db
       .prepare(
-        `INSERT INTO characters (name, prompt, negative_prompt, prompt_replacements, memo)
-         VALUES (?, ?, ?, ?, ?)`
+        `INSERT INTO characters (name, prompt, negative_prompt, prompt_replacements, memo, persona)
+         VALUES (?, ?, ?, ?, ?, ?)`
       )
       .run(
         input.name.trim(),
         input.prompt ?? '',
         input.negative_prompt ?? '',
         JSON.stringify(input.prompt_replacements ?? []),
-        input.memo ?? ''
+        input.memo ?? '',
+        input.persona ?? ''
       ).lastInsertRowid as number
     if (input.tag_ids?.length) setCharacterTags(id, input.tag_ids)
     return id
@@ -153,6 +155,7 @@ export function updateCharacter(id: number, input: CharacterUpdateInput): Charac
   if (input.prompt_replacements !== undefined)
     set('prompt_replacements', JSON.stringify(input.prompt_replacements))
   if (input.memo !== undefined) set('memo', input.memo)
+  if (input.persona !== undefined) set('persona', input.persona)
   set('updated_at', now())
   values.push(id)
   db.prepare(`UPDATE characters SET ${fields.join(', ')} WHERE id = ?`).run(...values)
