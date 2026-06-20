@@ -68,6 +68,10 @@ const api: Api = {
     generateDialogue: (id) => invoke('generations:generateDialogue', id) as Promise<never>,
     setDialogue: (id, text) => invoke('generations:setDialogue', id, text) as Promise<never>
   },
+  articles: {
+    compose: (batchId) => invoke('articles:compose', batchId) as Promise<never>,
+    regenerate: (input) => invoke('articles:regenerate', input) as Promise<never>
+  },
   settings: {
     get: (key) => invoke('settings:get', key) as Promise<never>,
     set: (key, value) => invoke('settings:set', key, value) as Promise<never>

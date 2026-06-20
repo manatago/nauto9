@@ -52,7 +52,7 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
   const samples = s.dialogue_samples
     .split('\n')
     .map((l) => replaceXxx(l.trim(), char.name))
-    .filter((l) => l.length > 0)
+    .filter((l) => l.length > 0 && !/場面転換/.test(l)) // 場面転換 markers are for article chapters, not dialogue
 
   const line = await generateLine({
     character: char.name,

@@ -15,6 +15,7 @@ import * as sit from '../db/situations'
 import * as batchRepo from '../db/batches'
 import { enqueueBatch, regenerateGeneration } from '../services/batch'
 import { enqueueDialogues, generateDialogueForGeneration } from '../services/dialogue'
+import { composeArticle, regenerateArticleBlock } from '../services/article'
 import { generateImage } from '../services/novelai'
 import { buildReferenceParams, referenceMode } from '../services/reference'
 import { decodeDataUrl, mediaUrl, saveImage, saveImageWithName, thumbKey } from '../services/images'
@@ -22,7 +23,7 @@ import { applyCharacterReplacements, replaceXxx } from '../services/prompt'
 import { generationKey, safeArcName, slug } from '../services/naming'
 import { storagePathFor } from '../paths'
 import { posix } from 'path'
-import type { BatchCreateInput, SceneBatchCreateInput } from '@shared/types'
+import type { ArticleRegenInput, BatchCreateInput, SceneBatchCreateInput } from '@shared/types'
 
 type Handler = (...args: never[]) => unknown
 
@@ -189,6 +190,9 @@ export function registerIpc(): void {
     batchRepo.setDialogue(id, text)
     return batchRepo.getGeneration(id)
   })
+
+  handle('articles:compose', (batchId: number) => composeArticle(batchId))
+  handle('articles:regenerate', (input: ArticleRegenInput) => regenerateArticleBlock(input))
   handle('generations:saveImage', (id: number, dataUrl: string) => {
     const g = batchRepo.getGenerationRow(id)
     if (!g) throw new Error('生成が見つかりません')

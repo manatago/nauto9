@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Download, Loader2, MessageSquare, Trash2, TriangleAlert } from 'lucide-react'
+import { Download, FileText, Loader2, MessageSquare, Trash2, TriangleAlert } from 'lucide-react'
 import type { Batch, BatchStatus, Generation } from '@shared/types'
 import { api, useBatches } from '../api'
 import { useToast } from '../components/Toast'
 import GenerationViewer from '../components/GenerationViewer'
+import ArticlePreview from '../components/ArticlePreview'
 
 const STATUS_LABEL: Record<BatchStatus, string> = {
   pending: '待機中',
@@ -53,6 +54,7 @@ export default function Gallery(): JSX.Element {
   const toast = useToast()
   const { data: batches, mutate } = useBatches()
   const [viewer, setViewer] = useState<{ batchId: number; index: number } | null>(null)
+  const [articleBatch, setArticleBatch] = useState<number | null>(null)
   const [downloading, setDownloading] = useState<number | null>(null)
   const [retryingIds, setRetryingIds] = useState<number[]>([])
 
@@ -165,6 +167,13 @@ export default function Gallery(): JSX.Element {
                         : 'セリフ一括生成'}
                     </button>
                     <button
+                      onClick={() => setArticleBatch(b.id)}
+                      disabled={success.length === 0}
+                      className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+                    >
+                      <FileText size={14} /> 記事作成
+                    </button>
+                    <button
                       onClick={() => download(b)}
                       disabled={success.length === 0 || downloading === b.id}
                       className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
@@ -208,6 +217,10 @@ export default function Gallery(): JSX.Element {
           onClose={() => setViewer(null)}
           onChanged={mutate}
         />
+      )}
+
+      {articleBatch !== null && (
+        <ArticlePreview batchId={articleBatch} onClose={() => setArticleBatch(null)} />
       )}
     </div>
   )

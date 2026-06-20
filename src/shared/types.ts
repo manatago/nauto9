@@ -172,6 +172,32 @@ export interface SituationUpdateInput {
   tag_ids?: number[]
 }
 
+// ---- articles (WordPress draft composition) ----
+
+export type ArticleBlockKind = 'h2' | 'chapterDesc' | 'dialogue' | 'image'
+
+export interface ArticleBlock {
+  id: string
+  kind: ArticleBlockKind
+  text: string // h2 / chapterDesc / dialogue text; '' for image
+  generation_id: number | null // dialogue & image
+  image_url: string | null // image (media:// url)
+  situation_id: number | null // h2 / chapterDesc — for regeneration context
+}
+
+export interface Article {
+  batch_id: number
+  title: string
+  intro: string
+  blocks: ArticleBlock[]
+}
+
+export interface ArticleRegenInput {
+  batch_id: number
+  target: 'title' | 'intro' | 'h2' | 'chapterDesc'
+  situation_id?: number | null // required for h2 / chapterDesc
+}
+
 // ---- IPC payloads ----
 
 export interface CharacterCreateInput {
@@ -271,6 +297,11 @@ export interface Api {
     saveImage(id: number, dataUrl: string): Promise<Generation> // save edited (mosaic) image
     generateDialogue(id: number): Promise<Generation> // LLM line for one image
     setDialogue(id: number, text: string): Promise<Generation> // manual edit
+  }
+  // Compose / preview a WordPress draft from a batch (posting comes later).
+  articles: {
+    compose(batchId: number): Promise<Article> // LLM title/intro + chapters + dialogue/image blocks
+    regenerate(input: ArticleRegenInput): Promise<string> // re-generate one text block
   }
   settings: {
     get(key: string): Promise<string | null>
