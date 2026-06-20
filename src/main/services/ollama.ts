@@ -99,9 +99,12 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
   // reference. The character's persona governs only HOW it's said (口調).
   let scene = `この場面の状況（内容の参考）: ${ctx.situation}\n`
   if (ctx.samples.length) {
+    // Shuffle so the model doesn't anchor on the same (first) example every time
+    // — otherwise every line starts with whatever the first sample starts with.
+    const shuffled = [...ctx.samples].sort(() => Math.random() - 0.5)
     scene +=
       `★この場面で${ctx.character}が言うセリフ（内容はこれを最優先で使う）:\n` +
-      ctx.samples.join('\n') +
+      shuffled.join('\n') +
       '\n'
     scene +=
       `上の★のセリフのどれか1つを選び、内容はほぼ変えずに${ctx.character}の口調・語尾に言い換えて、1つだけ書く。` +
@@ -149,13 +152,14 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
     return cleanLine(data.response ?? '')
   }
 
-  const first = await once(0.4)
+  // Warmer first pass for variety (so consecutive lines differ); the retry, which
+  // only fires on garbled/empty output, stays calmer to recover cleanly.
+  const first = await once(0.8)
   if (!looksGarbled(first)) {
     if (!first) throw new Error('モデルが空の応答を返しました')
     return first
   }
-  // Language bled through — try once more, calmer. Keep whichever is cleaner.
-  const retry = await once(0.25)
+  const retry = await once(0.4)
   const line = !looksGarbled(retry) ? retry : retry || first
   if (!line) throw new Error('モデルが空の応答を返しました')
   return line
