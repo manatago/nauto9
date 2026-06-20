@@ -127,9 +127,12 @@ function ReferenceSettings(): JSX.Element {
 }
 
 const LLM_KEYS = {
+  LLM_PROVIDER: 'local',
   OLLAMA_URL: 'http://localhost:11434',
   OLLAMA_MODEL: '',
-  DIALOGUE_PROMPT_TEMPLATE: ''
+  DIALOGUE_PROMPT_TEMPLATE: '',
+  GROK_API_KEY: '',
+  GROK_MODEL: 'grok-4.3'
 } as const
 
 function LlmSettings(): JSX.Element {
@@ -154,11 +157,54 @@ function LlmSettings(): JSX.Element {
 
   if (!loaded) return <section />
 
+  const provider = vals.LLM_PROVIDER || 'local'
+
   return (
     <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-ink-300">文章生成（ローカルLLM / Ollama）</h2>
+      <h2 className="text-sm font-semibold text-ink-300">文章生成（LLM）</h2>
+      <label className="block sm:max-w-xs">
+        <span className="mb-1 block text-xs text-ink-500">生成エンジン</span>
+        <select
+          value={provider}
+          onChange={(e) => save('LLM_PROVIDER', e.target.value)}
+          className="w-full rounded-md border border-ink-600 bg-ink-900 px-2 py-2 text-sm"
+        >
+          <option value="local">ローカル（Ollama）</option>
+          <option value="grok">リモート（Grok / xAI）</option>
+        </select>
+      </label>
+
+      {provider === 'grok' && (
+        <div className="space-y-3 rounded-md border border-ink-700 bg-ink-900/40 p-3">
+          <p className="text-xs text-ink-600">
+            xAI の Grok API でセリフを生成します。送信内容は xAI に送られます。露骨な表現は規約上拒否されることがあります。
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:max-w-lg">
+            <label className="block">
+              <span className="mb-1 block text-xs text-ink-500">API キー</span>
+              <input
+                type="password"
+                defaultValue={vals.GROK_API_KEY}
+                onBlur={(e) => e.target.value !== vals.GROK_API_KEY && save('GROK_API_KEY', e.target.value)}
+                placeholder="xai-..."
+                className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-ink-500">モデル名</span>
+              <input
+                defaultValue={vals.GROK_MODEL}
+                onBlur={(e) => e.target.value !== vals.GROK_MODEL && save('GROK_MODEL', e.target.value)}
+                placeholder="grok-4.3"
+                className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
+              />
+            </label>
+          </div>
+        </div>
+      )}
+
       <p className="text-xs text-ink-600">
-        画像ごとのセリフをローカルの Ollama で生成します。`ollama serve` を起動し、使うモデルを pull しておいてください。
+        ローカル（Ollama）の設定 — `ollama serve` を起動し、使うモデルを pull しておいてください。
       </p>
       <div className="grid grid-cols-2 gap-3 sm:max-w-lg">
         <label className="block">

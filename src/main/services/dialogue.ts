@@ -1,7 +1,13 @@
 import * as repo from '../db/repo'
 import * as sit from '../db/situations'
 import * as batches from '../db/batches'
-import { DEFAULT_DIALOGUE_TEMPLATE, generateDialogue, type OllamaOptions } from './ollama'
+import {
+  DEFAULT_DIALOGUE_TEMPLATE,
+  generateDialogue,
+  type DialogueContext,
+  type OllamaOptions
+} from './ollama'
+import { generateDialogueGrok } from './grok'
 import { replaceXxx } from './prompt'
 
 function ollamaOptions(): OllamaOptions {
@@ -10,6 +16,17 @@ function ollamaOptions(): OllamaOptions {
     model: repo.getSetting('OLLAMA_MODEL') || '',
     template: repo.getSetting('DIALOGUE_PROMPT_TEMPLATE') || DEFAULT_DIALOGUE_TEMPLATE
   }
+}
+
+// Dispatch to the configured provider: local Ollama (default) or remote Grok.
+function generateLine(ctx: DialogueContext): Promise<string> {
+  if ((repo.getSetting('LLM_PROVIDER') || 'local').trim() === 'grok') {
+    return generateDialogueGrok(ctx, {
+      apiKey: repo.getSetting('GROK_API_KEY') || '',
+      model: repo.getSetting('GROK_MODEL') || 'grok-4.3'
+    })
+  }
+  return generateDialogue(ctx, ollamaOptions())
 }
 
 // Gather context for one generation (character + story + situation) and ask the
@@ -34,17 +51,14 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
     .map((l) => replaceXxx(l.trim(), char.name))
     .filter((l) => l.length > 0)
 
-  const line = await generateDialogue(
-    {
-      character: char.name,
-      traits,
-      story: story?.name ?? '',
-      storyDesc: story?.description ?? '',
-      situation,
-      samples
-    },
-    ollamaOptions()
-  )
+  const line = await generateLine({
+    character: char.name,
+    traits,
+    story: story?.name ?? '',
+    storyDesc: story?.description ?? '',
+    situation,
+    samples
+  })
   batches.setDialogue(genId, line)
 }
 
