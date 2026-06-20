@@ -43,9 +43,10 @@ function tidy(s: string): string {
     .replace(/^[-‐*・]\s*/, '') // leading bullet copied from the few-shot examples
     .replace(/^（[^）]*）[：:]?\s*(?=\S)/, '') // leading （小声） prefix (only if a line follows)
     .replace(/^[^「。、！？（(]{0,8}[）)][：:]\s*/, '') // leading "小声）：" fragment
-    .replace(/[（(][^）)]*$/, '') // drop a truncated trailing stage direction like （苦笑
-    .replace(/^["'（(]+/, '')
-    .replace(/["'）)]+$/, '')
+    .replace(/『[^』]*』$/, '') // a trailing nested 『…』 (model wraps the 語尾 oddly)
+    .replace(/[（(『][^）)』]*$/, '') // a truncated trailing （苦笑 / 『…
+    .replace(/^["'（(『]+/, '')
+    .replace(/["'）)』]+$/, '')
     .trim()
 }
 
@@ -164,12 +165,20 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
   if (ctx.samples.length) {
     const candidates = await appropriateIndices()
     chosen = ctx.samples[candidates[Math.floor(Math.random() * candidates.length)]]
-    // Seed ~60% of the line: the opening (the nouns / topic) stays verbatim — no
-    // "天気"→"お空", no invented facts — while the tail is free to take on the
-    // character's voice (黒子→「…ですわ」 vs 撫子→「…かな？」). Higher (0.8) lost
-    // the voice; lower (≤0.45) let the model drift off-topic.
+    // Seed the opening of the line (the nouns / topic) verbatim — no "天気"→"お空",
+    // no invented facts — while leaving the tail free to take on the character's
+    // voice (黒子→「…ですわ」 vs 撫子→「…かな？」). Cut at a natural break (、。？！)
+    // within the first ~65% so the whole clause-tail can be revoiced; otherwise
+    // fall back to ~60% by length. Higher (0.8) lost the voice; lower (≤0.45) let
+    // the model drift off-topic.
     const chars = [...chosen]
-    seed = chars.slice(0, Math.max(2, Math.ceil(chars.length * 0.6))).join('')
+    const head = chars.slice(0, Math.max(2, Math.round(chars.length * 0.65))).join('')
+    const breaks = [...head.matchAll(/[、，。．？！]/g)]
+    const lastBreak = breaks.length ? breaks[breaks.length - 1].index + 1 : 0
+    seed =
+      lastBreak >= 2
+        ? head.slice(0, lastBreak)
+        : chars.slice(0, Math.max(2, Math.ceil(chars.length * 0.6))).join('')
   }
 
   let scene = `この場面の状況（前後関係の参考）: ${ctx.situation}\n`
