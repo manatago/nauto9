@@ -245,6 +245,73 @@ function LlmSettings(): JSX.Element {
   )
 }
 
+const WP_KEYS = {
+  WP_SITE_URL: '',
+  WP_USERNAME: '',
+  WP_APP_PASSWORD: ''
+} as const
+
+function WpSettings(): JSX.Element {
+  const toast = useToast()
+  const [vals, setVals] = useState<Record<string, string>>({})
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    const keys = Object.keys(WP_KEYS) as (keyof typeof WP_KEYS)[]
+    Promise.all(keys.map((k) => api.settings.get(k))).then((got) => {
+      const next: Record<string, string> = {}
+      keys.forEach((k, i) => (next[k] = got[i] ?? WP_KEYS[k]))
+      setVals(next)
+      setLoaded(true)
+    })
+  }, [])
+
+  const save = (key: string, value: string): void => {
+    setVals((s) => ({ ...s, [key]: value }))
+    api.settings.set(key, value).then(() => toast.success('保存しました'))
+  }
+
+  if (!loaded) return <section />
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold text-ink-300">WordPress 投稿</h2>
+      <p className="text-xs text-ink-600">
+        記事を下書きとして投稿します。認証はアプリケーションパスワード（ユーザー → プロフィール → アプリケーションパスワード）。
+      </p>
+      <label className="block sm:max-w-lg">
+        <span className="mb-1 block text-xs text-ink-500">サイト URL</span>
+        <input
+          defaultValue={vals.WP_SITE_URL}
+          onBlur={(e) => e.target.value !== vals.WP_SITE_URL && save('WP_SITE_URL', e.target.value.trim())}
+          placeholder="https://example.com"
+          className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
+        />
+      </label>
+      <div className="grid grid-cols-2 gap-3 sm:max-w-lg">
+        <label className="block">
+          <span className="mb-1 block text-xs text-ink-500">ユーザー名</span>
+          <input
+            defaultValue={vals.WP_USERNAME}
+            onBlur={(e) => e.target.value !== vals.WP_USERNAME && save('WP_USERNAME', e.target.value)}
+            className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-ink-500">アプリケーションパスワード</span>
+          <input
+            type="password"
+            defaultValue={vals.WP_APP_PASSWORD}
+            onBlur={(e) => e.target.value !== vals.WP_APP_PASSWORD && save('WP_APP_PASSWORD', e.target.value)}
+            placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
+            className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
+          />
+        </label>
+      </div>
+    </section>
+  )
+}
+
 export default function Settings(): JSX.Element {
   const toast = useToast()
   const [token, setToken] = useState('')
@@ -289,6 +356,7 @@ export default function Settings(): JSX.Element {
 
       <ReferenceSettings />
       <LlmSettings />
+      <WpSettings />
     </div>
   )
 }

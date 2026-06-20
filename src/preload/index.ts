@@ -70,7 +70,8 @@ const api: Api = {
   },
   articles: {
     compose: (batchId) => invoke('articles:compose', batchId) as Promise<never>,
-    regenerate: (input) => invoke('articles:regenerate', input) as Promise<never>
+    regenerate: (input) => invoke('articles:regenerate', input) as Promise<never>,
+    post: (input) => invoke('articles:post', input) as Promise<never>
   },
   settings: {
     get: (key) => invoke('settings:get', key) as Promise<never>,

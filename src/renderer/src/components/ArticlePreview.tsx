@@ -1,9 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Loader2, RefreshCw, Upload } from 'lucide-react'
 import type { Article, ArticleBlock } from '@shared/types'
 import { api } from '../api'
 import { useToast } from './Toast'
 import Modal from './Modal'
+
+// Convert a (PNG) data URL to a webp data URL using the browser canvas encoder.
+async function toWebp(dataUrl: string, quality = 0.9): Promise<string> {
+  const img = new Image()
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('画像の読み込みに失敗しました'))
+    img.src = dataUrl
+  })
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('canvas が使えません')
+  ctx.drawImage(img, 0, 0)
+  return canvas.toDataURL('image/webp', quality)
+}
 
 interface Props {
   batchId: number
@@ -17,6 +34,7 @@ export default function ArticlePreview({ batchId, onClose }: Props): JSX.Element
   const [article, setArticle] = useState<Article | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null) // 'title' | 'intro' | block id
+  const [posting, setPosting] = useState<string | null>(null) // progress label while posting
 
   useEffect(() => {
     let alive = true
@@ -49,6 +67,39 @@ export default function ArticlePreview({ batchId, onClose }: Props): JSX.Element
       toast.error((e as Error).message)
     } finally {
       setBusy(null)
+    }
+  }
+
+  async function post(): Promise<void> {
+    if (!article) return
+    try {
+      const imageBlocks = article.blocks.filter(
+        (b) => b.kind === 'image' && b.generation_id != null
+      )
+      const images: { generation_id: number; data_url: string; filename: string }[] = []
+      for (let i = 0; i < imageBlocks.length; i++) {
+        const b = imageBlocks[i]
+        setPosting(`画像変換 ${i + 1}/${imageBlocks.length}`)
+        const png = await api.generations.imageData(b.generation_id as number)
+        images.push({
+          generation_id: b.generation_id as number,
+          data_url: await toWebp(png),
+          filename: `nauto9-${b.generation_id}.webp`
+        })
+      }
+      setPosting('WordPressへ送信中…')
+      const res = await api.articles.post({
+        title: article.title,
+        intro: article.intro,
+        blocks: article.blocks,
+        images
+      })
+      toast.success(`下書きを作成しました: ${res.link}`)
+      window.open(res.link, '_blank')
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setPosting(null)
     }
   }
 
@@ -134,9 +185,17 @@ export default function ArticlePreview({ batchId, onClose }: Props): JSX.Element
           </div>
           <hr className="border-ink-700" />
           {article.blocks.map(renderBlock)}
-          <p className="pt-2 text-center text-[11px] text-ink-600">
-            WordPressへの投稿は次のステップで追加します。
-          </p>
+          <div className="flex items-center justify-end gap-3 border-t border-ink-700 pt-3">
+            <span className="text-[11px] text-ink-600">画像はwebpに変換して下書きとして投稿します</span>
+            <button
+              onClick={post}
+              disabled={posting !== null || busy !== null}
+              className="flex items-center gap-1.5 rounded-md bg-accent/20 px-3 py-1.5 text-sm text-accent ring-1 ring-accent/50 hover:bg-accent/30 disabled:opacity-40"
+            >
+              {posting ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {posting ?? 'WordPressに下書き投稿'}
+            </button>
+          </div>
         </div>
       )}
     </Modal>

@@ -2,11 +2,19 @@
 // and intro, chapter headings at 場面転換 markers, and each image preceded by its
 // dialogue (h3). The HTML is built for the future posting step; the renderer
 // previews the structured blocks and can edit / regenerate text.
-import type { Article, ArticleBlock, ArticleRegenInput } from '@shared/types'
+import type {
+  Article,
+  ArticleBlock,
+  ArticlePostInput,
+  ArticlePostResult,
+  ArticleRegenInput
+} from '@shared/types'
 import * as batches from '../db/batches'
 import * as sit from '../db/situations'
 import * as repo from '../db/repo'
 import { generateText } from './llm'
+import { decodeDataUrl } from './images'
+import { createDraft, uploadMedia, wpConfigFrom } from './wordpress'
 
 function storyDescription(storyId: number | null): string {
   if (!storyId) return ''
@@ -181,15 +189,53 @@ function esc(s: string): string {
     .replace(/>/g, '&gt;')
 }
 
-export function buildArticleHtml(article: Article): string {
+// `imageFor` resolves an image block to its <img> attributes (URL + optional WP
+// media id). Returns null to skip the image.
+export function buildArticleHtml(
+  a: { intro: string; blocks: ArticleBlock[] },
+  imageFor: (b: ArticleBlock) => { url: string; mediaId?: number } | null
+): string {
   const out: string[] = []
-  if (article.intro.trim()) out.push(`<p>${esc(article.intro.trim())}</p>`)
-  for (const b of article.blocks) {
+  if (a.intro.trim()) out.push(`<p>${esc(a.intro.trim())}</p>`)
+  for (const b of a.blocks) {
     if (b.kind === 'h2') out.push(`<h2>${esc(b.text)}</h2>`)
     else if (b.kind === 'chapterDesc') out.push(`<p>${esc(b.text)}</p>`)
     else if (b.kind === 'dialogue') out.push(`<h3>${esc(b.text)}</h3>`)
-    else if (b.kind === 'image' && b.image_url)
-      out.push(`<figure><img src="${b.image_url}" alt="" /></figure>`)
+    else if (b.kind === 'image') {
+      const img = imageFor(b)
+      if (img) {
+        const cls = img.mediaId ? ` class="wp-image-${img.mediaId}"` : ''
+        out.push(`<figure><img src="${img.url}"${cls} alt="" /></figure>`)
+      }
+    }
   }
   return out.join('\n')
+}
+
+// Upload each (webp) image to WordPress media, then create a draft post whose
+// body uses the uploaded URLs. Tags / publish date are left for the user.
+export async function postArticleToWordpress(
+  input: ArticlePostInput
+): Promise<ArticlePostResult> {
+  const cfg = wpConfigFrom(
+    repo.getSetting('WP_SITE_URL'),
+    repo.getSetting('WP_USERNAME'),
+    repo.getSetting('WP_APP_PASSWORD')
+  )
+
+  const uploaded = new Map<number, { url: string; mediaId: number }>()
+  for (const img of input.images) {
+    const { buf } = decodeDataUrl(img.data_url)
+    const safeName = (img.filename || `image-${img.generation_id}.webp`)
+      .replace(/[^\w.-]/g, '_')
+      .replace(/_+/g, '_')
+    const name = safeName.endsWith('.webp') ? safeName : `${safeName}.webp`
+    const media = await uploadMedia(cfg, name, 'image/webp', buf)
+    uploaded.set(img.generation_id, { url: media.source_url, mediaId: media.id })
+  }
+
+  const html = buildArticleHtml(input, (b) =>
+    b.generation_id != null ? (uploaded.get(b.generation_id) ?? null) : null
+  )
+  return createDraft(cfg, input.title.trim() || '無題', html)
 }

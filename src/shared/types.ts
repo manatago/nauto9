@@ -198,6 +198,25 @@ export interface ArticleRegenInput {
   situation_id?: number | null // required for h2 / chapterDesc
 }
 
+// One image to upload (already converted to webp in the renderer via canvas).
+export interface ArticleImageUpload {
+  generation_id: number
+  data_url: string // webp data: URL
+  filename: string
+}
+
+export interface ArticlePostInput {
+  title: string
+  intro: string
+  blocks: ArticleBlock[] // edited text/structure
+  images: ArticleImageUpload[]
+}
+
+export interface ArticlePostResult {
+  id: number
+  link: string // the draft's edit/preview link
+}
+
 // ---- IPC payloads ----
 
 export interface CharacterCreateInput {
@@ -302,6 +321,7 @@ export interface Api {
   articles: {
     compose(batchId: number): Promise<Article> // LLM title/intro + chapters + dialogue/image blocks
     regenerate(input: ArticleRegenInput): Promise<string> // re-generate one text block
+    post(input: ArticlePostInput): Promise<ArticlePostResult> // upload webp media + create a draft
   }
   settings: {
     get(key: string): Promise<string | null>
