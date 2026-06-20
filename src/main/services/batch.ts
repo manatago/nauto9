@@ -8,7 +8,7 @@ import { generateImage } from './novelai'
 import { buildReferenceParams } from './reference'
 import { saveImageWithName } from './images'
 import { generationKey } from './naming'
-import { applyCharacterReplacements, replaceXxx } from './prompt'
+import { applyCharacterReplacements, replaceXxx, stripEyeColorIfClosed } from './prompt'
 
 interface CharLike {
   id: number
@@ -35,6 +35,9 @@ async function generateAndSave(
     : situation.prompt
   let scene = replaceXxx(base, char.name)
   scene = applyCharacterReplacements(scene, char.prompt_replacements)
+  // When the scene closes the eyes, drop eye-color tags from the character prompt
+  // (otherwise the color tag keeps the eyes open).
+  const charPrompt = stripEyeColorIfClosed(char.prompt, scene)
   const negative = [situation.negative_prompt, char.negative_prompt]
     .map((x) => x.trim())
     .filter(Boolean)
@@ -42,7 +45,7 @@ async function generateAndSave(
   const ref = token ? await buildReferenceParams(char.id, scene, token) : undefined
   const png = await generateImage({
     token,
-    charPrompt: char.prompt,
+    charPrompt,
     scenePrompt: scene,
     negativePrompt: negative,
     aspect: situation.aspect_ratio,
