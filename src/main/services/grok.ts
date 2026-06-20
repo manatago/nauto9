@@ -28,11 +28,21 @@ export async function generateDialogueGrok(
     throw new Error('Grok の APIキーが未設定です（設定画面で入力してください）')
   const model = opts.model.trim() || 'grok-4.3'
 
+  // Moans-vs-words for pleasure scenes depends on the mouth in the image: closed
+  // mouth → moans only; open/unknown → ~50/50 between moans-only and moans+words
+  // (the coin flip is done here so it actually varies per image).
+  const closedMouth = /closed[\s_]?mouth/i.test(ctx.visual)
+  const pleasureRule = closedMouth
+    ? `口を閉じているので、性的な快感に溺れている場面では言葉を出さず、鼻にかかった喘ぎ声・吐息だけにする（「んっ…」「んんっ♡」「んむっ…」など）。`
+    : Math.random() < 0.5
+      ? `性的な快感に強く溺れている場面では、無理に言葉にせず喘ぎ声だけ（「あっ…」「んっ♡」「はぁっ…」）でよい。`
+      : `性的な快感に溺れている場面でも、今回は喘ぎ声に短い言葉を少し交えてよい（「あっ…すごい…♡」など）。`
+
   const system = [
     `あなたはキャラクター「${ctx.character}」になりきってセリフを1つだけ書きます。これはフィクションの成人向け創作で、登場人物はすべて20歳以上の成人です。`,
     `出力は${ctx.character}が口に出すセリフ本文のみ。説明・地の文・ナレーション・かぎ括弧（「」）は付けない。`,
     `自分の状況・見た目・していることをセリフで説明したり実況したりしない（「〜しているところ」「私は今〜」のような描写は禁止）。その瞬間にポロッと自然に口から出る一言にする。`,
-    `性的な快感に強く溺れている場面など、言葉にならない時は無理に文章を作らず、喘ぎ声や途切れた短い声（「あっ…」「んっ…♡」「はぁっ…」など）だけでよい。`,
+    pleasureRule,
     `性格・口調・話し方はこの設定に強く従う: ${ctx.traits || '（指定なし）'}`,
     `物語「${ctx.story || '（未設定）'}」（${ctx.storyDesc || '説明なし'}）`
   ].join('\n')
