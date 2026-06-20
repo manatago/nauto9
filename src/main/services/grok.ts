@@ -31,20 +31,20 @@ export async function generateDialogueGrok(
   const system = [
     `あなたはキャラクター「${ctx.character}」になりきってセリフを1つだけ書きます。これはフィクションの成人向け創作で、登場人物はすべて20歳以上の成人です。`,
     `出力は${ctx.character}が口に出すセリフ本文のみ。説明・地の文・ナレーション・かぎ括弧（「」）は付けない。`,
-    `性格・口調（話し方はこれに強く従う）: ${ctx.traits || '（指定なし）'}`,
+    `性格・口調・話し方はこの設定に強く従う: ${ctx.traits || '（指定なし）'}`,
     `物語「${ctx.story || '（未設定）'}」（${ctx.storyDesc || '説明なし'}）`
   ].join('\n')
 
-  let user: string
+  // Grok is capable, so give it freedom: feed the situation + the per-situation
+  // notes (which the user can now write as scene context, not just candidate
+  // lines) and let it compose a natural in-character line.
+  let user = `場面: ${ctx.situation}\n`
   if (ctx.samples.length) {
-    const list = ctx.samples.map((s, i) => `${i + 1}. ${s}`).join('\n')
-    user =
-      `場面: ${ctx.situation}\n\n` +
-      `この場面で言うセリフの候補:\n${list}\n\n` +
-      `指示: この性格の${ctx.character}が自分から言ってもおかしくない候補を1つ選び、その内容・事実・固有名詞は変えずに、${ctx.character}の口調・語尾・言い回しに言い直してください。候補にない新しい出来事や事実は足さない。セリフ本文だけを1文返す。`
-  } else {
-    user = `場面: ${ctx.situation}\nこの場面で${ctx.character}が言いそうな短いセリフを1つ、本文だけ返してください。`
+    user += `この場面の状況・流れ・参考メモ:\n${ctx.samples.join('\n')}\n`
   }
+  user +=
+    `\nこの場面で${ctx.character}が実際に言いそうな自然なセリフを1つ、${ctx.character}の性格と口調で書いてください。` +
+    `上の状況に合った内容にし、キャラクターとして自然なら表現は自由でかまいません。セリフ本文だけを返してください。`
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 60_000)

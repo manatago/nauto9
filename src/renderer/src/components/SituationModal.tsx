@@ -149,14 +149,16 @@ export default function SituationModal({
         </div>
         <label className="block lg:col-span-2">
           <span className="mb-1 block text-xs text-ink-500">
-            セリフ例（任意・1行に1つ）
-            <span className="text-ink-600">　この状況で言いそうなセリフを改行で複数。生成時に口調の手本に使われます（`xxx`はキャラ名へ置換）</span>
+            状況メモ / セリフ例（任意・1行に1つ）
+            <span className="text-ink-600">
+              　セリフ生成の文脈。状況や流れを書くのがおすすめ（Grok向き）。言いそうなセリフ例でも可（ローカル向き）。`xxx`はキャラ名へ置換
+            </span>
           </span>
           <textarea
             value={samples}
             onChange={(e) => setSamples(e.target.value)}
             rows={4}
-            placeholder={'あぅ…見ないでぇ…\nもう、xxxのこと知らないんだから！\nこんなの…恥ずかしいよぅ…'}
+            placeholder={'例（状況）: xxxは水着姿を見られて恥ずかしがっている。からかわれて少しムキになる。\n例（セリフ）: あぅ…見ないでぇ…'}
             className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60"
           />
         </label>
