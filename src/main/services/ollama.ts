@@ -5,10 +5,10 @@
 // This is sent as the SYSTEM message (roleplay framing). The situation is sent
 // separately as the user message, so {situation} is optional here.
 export const DEFAULT_DIALOGUE_TEMPLATE = [
-  'あなたはキャラクター「{character}」になりきってロールプレイします。これはフィクションのセリフ作成です。',
-  '情景や他の人を描写せず、{character}が実際に口に出す短いセリフ1文だけを、自然な日本語で書いてください。',
+  'あなたはキャラクター「{character}」になりきってセリフを1つ書きます。これはフィクションです。',
+  '情景や他人を描写せず、{character}が実際に口に出す短いセリフ1文だけを、自然な日本語で書く。',
   '説明・地の文・ナレーション・ト書き・英単語・ローマ字・中国語は書かない。',
-  '性格・口調・特徴（最優先で忠実に従う）: {traits}',
+  '【話し方・口調】（ここは口調だけを真似る。何を言うかの内容はあとで指定するものを優先）: {traits}',
   '物語「{story}」（{story_desc}）。'
 ].join('\n')
 
@@ -76,20 +76,17 @@ function looksGarbled(s: string): boolean {
   return false
 }
 
-// Sampling tuned to suppress qwen2.5's degeneration: low temperature + a repeat
-// penalty kills the "rambles into Chinese finance boilerplate" failure mode, and
-// a newline stop keeps it to a single spoken line. `temperature` is overridable
-// so the retry can be even calmer.
-function chatOptions(temperature: number): Record<string, unknown> {
+// Low temperature + repeat penalty suppress degeneration. The stops close the
+// generation at the end of the single spoken line: 」 ends the quote we opened
+// with the primer, 「 prevents starting a second line, \n / [INST] catch strays.
+function genOptions(temperature: number): Record<string, unknown> {
   return {
     temperature,
     top_p: 0.9,
     top_k: 40,
     repeat_penalty: 1.2,
-    num_predict: 64 // one short line; prevents rambling into garbage
-    // No \n stop: it fires on a leading newline (→ empty) with some chat
-    // templates. cleanLine() already extracts the first spoken line, and each
-    // model's own EOS / [/INST] stop terminates generation.
+    num_predict: 64, // one short line; prevents rambling into prose
+    stop: ['」', '「', '\n', '[INST]']
   }
 }
 
@@ -97,18 +94,26 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
   if (!opts.model.trim())
     throw new Error('Ollama のモデル名が未設定です（設定画面で入力してください）')
   const system = fillTemplate(opts.template || DEFAULT_DIALOGUE_TEMPLATE, ctx)
-  // Per-situation example lines go in the USER message, right before the ask —
-  // the most salient position. (In the system message they were buried after a
-  // long persona that may itself contain many example lines, and got drowned
-  // out.) The character's persona still governs the overall voice.
-  let user = `状況: ${ctx.situation}\n`
+  // Content priority: the user's per-situation example lines are the MOST
+  // important driver of what's said; the situation prompt/title is secondary
+  // reference. The character's persona governs only HOW it's said (口調).
+  let scene = `この場面の状況（内容の参考）: ${ctx.situation}\n`
   if (ctx.samples.length) {
-    user +=
-      `この状況での${ctx.character}のセリフはこんな感じ（口調と雰囲気を強く参考にする。丸写しはしない）:\n` +
-      ctx.samples.map((s) => `「${s}」`).join('\n') +
+    scene +=
+      `★この場面で${ctx.character}が言うセリフ（内容はこれを最優先で使う）:\n` +
+      ctx.samples.join('\n') +
       '\n'
+    scene +=
+      `上の★のセリフのどれか1つを選び、内容はほぼ変えずに${ctx.character}の口調・語尾に言い換えて、1つだけ書く。` +
+      `★に書かれていない出来事や事実（物を買った・過去の話など）は勝手に足さない。`
+  } else {
+    scene += `この場面で${ctx.character}が言う短いセリフを1つ。`
   }
-  user += `このときの「${ctx.character}」が言う短いセリフを1文だけ、日本語で。`
+  // Mistral [INST] prompt with an assistant primer that OPENS a quote: the model
+  // can then only complete a spoken line. Ninja is a novel model and will write
+  // narration/地の文 if left to free-form; opening 「 and stopping at 」 makes
+  // that structurally impossible. `raw` so our [INST] text is sent verbatim.
+  const prompt = `[INST] ${system}\n\n${scene} [/INST] ${ctx.character}「`
   const base = (opts.url || 'http://localhost:11434').replace(/\/+$/, '')
 
   async function once(temperature: number): Promise<string> {
@@ -116,18 +121,16 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
     const timer = setTimeout(() => controller.abort(), 180_000) // 12B can be slow
     let res: Response
     try {
-      res = await fetch(`${base}/api/chat`, {
+      res = await fetch(`${base}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: opts.model.trim(),
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user }
-          ],
+          prompt,
+          raw: true,
           stream: false,
           keep_alive: '20m', // keep the model resident so consecutive lines don't reload it
-          options: chatOptions(temperature)
+          options: genOptions(temperature)
         }),
         signal: controller.signal
       })
@@ -142,8 +145,8 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
       const t = await res.text().catch(() => '')
       throw new Error(`Ollama HTTP ${res.status}: ${t.slice(0, 200)}`)
     }
-    const data = (await res.json()) as { message?: { content?: string } }
-    return cleanLine(data.message?.content ?? '')
+    const data = (await res.json()) as { response?: string }
+    return cleanLine(data.response ?? '')
   }
 
   const first = await once(0.4)
