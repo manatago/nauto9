@@ -97,27 +97,42 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
   // Content priority: the user's per-situation example lines are the MOST
   // important driver of what's said; the situation prompt/title is secondary
   // reference. The character's persona governs only HOW it's said (口調).
-  let scene = `この場面の状況（内容の参考）: ${ctx.situation}\n`
+  let scene = `この場面の状況（前後関係の参考）: ${ctx.situation}\n`
+  let seed = ''
   if (ctx.samples.length) {
-    // Shuffle so the model doesn't anchor on the same (first) example every time
-    // — otherwise every line starts with whatever the first sample starts with.
-    const shuffled = [...ctx.samples].sort(() => Math.random() - 0.5)
+    // Pick ONE example line and restyle only its 口調 — staying close to what the
+    // user wrote, no invented facts. Variety across images comes from WHICH line
+    // is picked (random per call). We also seed the assistant reply with the
+    // opening of the chosen line, so the model continues THAT content instead of
+    // drifting to whatever the persona suggests; the seed is prepended back.
+    const chosen = ctx.samples[Math.floor(Math.random() * ctx.samples.length)]
+    const chars = [...chosen]
+    seed = chars.slice(0, Math.max(2, Math.ceil(chars.length * 0.5))).join('')
     scene +=
-      `★この場面で${ctx.character}が言うセリフ（内容はこれを最優先で使う）:\n` +
-      shuffled.join('\n') +
-      '\n'
-    scene +=
-      `上の★のセリフのどれか1つを選び、内容はほぼ変えずに${ctx.character}の口調・語尾に言い換えて、1つだけ書く。` +
-      `★に書かれていない出来事や事実（物を買った・過去の話など）は勝手に足さない。`
+      `次のセリフを、${ctx.character}の口調・語尾だけ整えて言い直してください。` +
+      `意味・話題は変えない。新しい事実や出来事（買い物・過去の話など）は足さない。元のセリフから大きく離れない。\n` +
+      `元のセリフ: ${chosen}`
   } else {
     scene += `この場面で${ctx.character}が言う短いセリフを1つ。`
   }
-  // Mistral [INST] prompt with an assistant primer that OPENS a quote: the model
-  // can then only complete a spoken line. Ninja is a novel model and will write
-  // narration/地の文 if left to free-form; opening 「 and stopping at 」 makes
-  // that structurally impossible. `raw` so our [INST] text is sent verbatim.
-  const prompt = `[INST] ${system}\n\n${scene} [/INST] ${ctx.character}「`
+  // Mistral [INST] prompt with an assistant primer that OPENS a quote (plus the
+  // seed): the model can then only complete a spoken line. Ninja is a novel model
+  // and writes 地の文 if left free-form; opening 「 and stopping at 」 makes that
+  // structurally impossible. `raw` so our [INST] text is sent verbatim.
+  const prompt = `[INST] ${system}\n\n${scene} [/INST] ${ctx.character}「${seed}`
   const base = (opts.url || 'http://localhost:11434').replace(/\/+$/, '')
+
+  // Reconstruct the spoken line. In seed mode the completion continues after the
+  // seed, so prepend it; also drop any prompt-echo that slipped past the stops
+  // (a literal "\n口調: …" / "[INST]" the model sometimes parrots).
+  function finalize(raw: string): string {
+    if (!seed) return cleanLine(raw)
+    const head = raw
+      .split('\n')[0]
+      .split('\\n')[0]
+      .replace(/(口調|元のセリフ|\[\/?INST\]).*$/s, '')
+    return tidy(seed + head)
+  }
 
   async function once(temperature: number): Promise<string> {
     const controller = new AbortController()
@@ -149,17 +164,17 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
       throw new Error(`Ollama HTTP ${res.status}: ${t.slice(0, 200)}`)
     }
     const data = (await res.json()) as { response?: string }
-    return cleanLine(data.response ?? '')
+    return finalize(data.response ?? '')
   }
 
-  // Warmer first pass for variety (so consecutive lines differ); the retry, which
-  // only fires on garbled/empty output, stays calmer to recover cleanly.
-  const first = await once(0.8)
+  // Moderate temperature: we want a faithful restyle of the chosen line, not
+  // invention. Variety comes from the random sample pick above, so keep this low.
+  const first = await once(0.5)
   if (!looksGarbled(first)) {
     if (!first) throw new Error('モデルが空の応答を返しました')
     return first
   }
-  const retry = await once(0.4)
+  const retry = await once(0.35)
   const line = !looksGarbled(retry) ? retry : retry || first
   if (!line) throw new Error('モデルが空の応答を返しました')
   return line
