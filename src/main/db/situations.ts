@@ -96,6 +96,7 @@ function toSituation(r: Row): Situation {
     aspect_ratio: r.aspect_ratio as AspectRatio,
     order_index: r.order_index as number,
     tags: tagsForSituation(r.id as number),
+    dialogue_samples: (r.dialogue_samples as string) ?? '',
     preview_image_path: previewPath,
     preview_image_url: mediaUrlOrNull(previewPath),
     created_at: r.created_at as string,
@@ -171,8 +172,8 @@ export function createSituation(input: SituationCreateInput): Situation {
   ).m
   const id = db
     .prepare(
-      `INSERT INTO situations (story_id, name, prompt, negative_prompt, aspect_ratio, order_index)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO situations (story_id, name, prompt, negative_prompt, aspect_ratio, dialogue_samples, order_index)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       input.story_id,
@@ -180,6 +181,7 @@ export function createSituation(input: SituationCreateInput): Situation {
       input.prompt ?? '',
       input.negative_prompt ?? '',
       input.aspect_ratio ?? 'portrait',
+      input.dialogue_samples ?? '',
       max + 1
     ).lastInsertRowid as number
   if (input.tag_ids?.length) setSituationTags(id, input.tag_ids)
@@ -199,6 +201,7 @@ export function updateSituation(id: number, input: SituationUpdateInput): Situat
   if (input.prompt !== undefined) set('prompt', input.prompt)
   if (input.negative_prompt !== undefined) set('negative_prompt', input.negative_prompt)
   if (input.aspect_ratio !== undefined) set('aspect_ratio', input.aspect_ratio)
+  if (input.dialogue_samples !== undefined) set('dialogue_samples', input.dialogue_samples)
   set('updated_at', now())
   values.push(id)
   db.prepare(`UPDATE situations SET ${fields.join(', ')} WHERE id = ?`).run(...values)

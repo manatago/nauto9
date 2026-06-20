@@ -78,6 +78,7 @@ export interface Situation {
   aspect_ratio: AspectRatio
   order_index: number
   tags: Tag[] // from the situation tag pool (separate from character tags)
+  dialogue_samples: string // newline-separated example lines (few-shot tone for dialogue)
   preview_image_path: string | null
   preview_image_url: string | null // media:// (derived); the row background
   created_at: string
@@ -157,6 +158,7 @@ export interface SituationCreateInput {
   prompt?: string
   negative_prompt?: string
   aspect_ratio?: AspectRatio
+  dialogue_samples?: string
   tag_ids?: number[]
 }
 
@@ -166,6 +168,7 @@ export interface SituationUpdateInput {
   prompt?: string
   negative_prompt?: string
   aspect_ratio?: AspectRatio
+  dialogue_samples?: string
   tag_ids?: number[]
 }
 

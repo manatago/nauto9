@@ -34,6 +34,7 @@ export default function SituationModal({
   const [prompt, setPrompt] = useState('')
   const [neg, setNeg] = useState('')
   const [aspect, setAspect] = useState<AspectRatio>('portrait')
+  const [samples, setSamples] = useState('')
   const [targetStory, setTargetStory] = useState(storyId)
   const [tagIds, setTagIds] = useState<number[]>([])
 
@@ -43,6 +44,7 @@ export default function SituationModal({
     setPrompt(situation?.prompt ?? '')
     setNeg(situation?.negative_prompt ?? '')
     setAspect(situation?.aspect_ratio ?? 'portrait')
+    setSamples(situation?.dialogue_samples ?? '')
     setTargetStory(situation?.story_id ?? storyId)
     setTagIds(situation?.tags.map((t) => t.id) ?? [])
   }, [open, situation, storyId])
@@ -60,6 +62,7 @@ export default function SituationModal({
         prompt,
         negative_prompt: neg,
         aspect_ratio: aspect,
+        dialogue_samples: samples,
         tag_ids: tagIds
       }
       if (situation) {
@@ -144,6 +147,19 @@ export default function SituationModal({
             </select>
           </label>
         </div>
+        <label className="block lg:col-span-2">
+          <span className="mb-1 block text-xs text-ink-500">
+            セリフ例（任意・1行に1つ）
+            <span className="text-ink-600">　この状況で言いそうなセリフを改行で複数。生成時に口調の手本に使われます（`xxx`はキャラ名へ置換）</span>
+          </span>
+          <textarea
+            value={samples}
+            onChange={(e) => setSamples(e.target.value)}
+            rows={4}
+            placeholder={'あぅ…見ないでぇ…\nもう、xxxのこと知らないんだから！\nこんなの…恥ずかしいよぅ…'}
+            className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60"
+          />
+        </label>
         <div className="lg:col-span-2">
           <TagPicker tags={tags ?? []} selected={tagIds} onToggle={(id, on) => setTagIds((ids) => (on ? ids.filter((x) => x !== id) : [...ids, id]))} onCreate={createTag} />
         </div>

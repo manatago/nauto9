@@ -28,6 +28,11 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
   const traits = char.persona.trim() || char.memo.trim() || char.prompt.trim()
   // Likewise, feed the (ideally Japanese) situation NAME, not the English prompt.
   const situation = replaceXxx((s.name.trim() || s.prompt).trim(), char.name)
+  // Per-situation example lines (newline-separated) → few-shot tone guidance.
+  const samples = s.dialogue_samples
+    .split('\n')
+    .map((l) => replaceXxx(l.trim(), char.name))
+    .filter((l) => l.length > 0)
 
   const line = await generateDialogue(
     {
@@ -35,7 +40,8 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
       traits,
       story: story?.name ?? '',
       storyDesc: story?.description ?? '',
-      situation
+      situation,
+      samples
     },
     ollamaOptions()
   )

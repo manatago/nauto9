@@ -3,7 +3,7 @@ import { rmSync } from 'fs'
 import { join } from 'path'
 import { storageRoot } from '../paths'
 
-const SCHEMA_VERSION = 11
+const SCHEMA_VERSION = 12
 
 // Simple model: a character is a single prompt + tags + reference images.
 // (The earlier clothing/state/outfit layer was removed — make separate
@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS situations (
   negative_prompt TEXT NOT NULL DEFAULT '',
   aspect_ratio TEXT NOT NULL DEFAULT 'portrait',
   order_index INTEGER NOT NULL DEFAULT 0,
+  dialogue_samples TEXT NOT NULL DEFAULT '',
   preview_image_path TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -204,6 +205,11 @@ export function migrate(db: Database.Database): void {
   }
   if (v < 11) {
     addColumnIfMissing(db, 'characters', 'persona', "TEXT NOT NULL DEFAULT ''")
+  }
+  if (v < 12) {
+    // Per-situation example lines (newline-separated) used as few-shot tone
+    // guidance for dialogue generation.
+    addColumnIfMissing(db, 'situations', 'dialogue_samples', "TEXT NOT NULL DEFAULT ''")
   }
 
   db.pragma(`user_version = ${SCHEMA_VERSION}`)

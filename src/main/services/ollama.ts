@@ -18,6 +18,7 @@ export interface DialogueContext {
   story: string
   storyDesc: string
   situation: string
+  samples: string[] // example lines for this situation (few-shot tone guidance)
 }
 
 export interface OllamaOptions {
@@ -83,7 +84,14 @@ function chatOptions(temperature: number): Record<string, unknown> {
 export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions): Promise<string> {
   if (!opts.model.trim())
     throw new Error('Ollama のモデル名が未設定です（設定画面で入力してください）')
-  const system = fillTemplate(opts.template || DEFAULT_DIALOGUE_TEMPLATE, ctx)
+  let system = fillTemplate(opts.template || DEFAULT_DIALOGUE_TEMPLATE, ctx)
+  // Append per-situation example lines as few-shot tone guidance. Kept out of the
+  // editable template so it works with any template the user has customized.
+  if (ctx.samples.length) {
+    system +=
+      '\nこの状況で言いそうなセリフの例（口調と雰囲気の参考。そのまま流用せず参考にする）:\n' +
+      ctx.samples.map((s) => `- ${s}`).join('\n')
+  }
   const user = `状況: ${ctx.situation}\nこのときの「${ctx.character}」が言う短いセリフを1文だけ、日本語で。`
   const base = (opts.url || 'http://localhost:11434').replace(/\/+$/, '')
 
