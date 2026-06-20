@@ -18,6 +18,7 @@ export interface DialogueContext {
   story: string
   storyDesc: string
   situation: string
+  visual: string // the situation's image prompt (pose/clothing/composition) — visual context
   samples: string[] // example lines for this situation (few-shot tone guidance)
 }
 

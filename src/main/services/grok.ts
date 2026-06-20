@@ -39,6 +39,9 @@ export async function generateDialogueGrok(
   // notes (which the user can now write as scene context, not just candidate
   // lines) and let it compose a natural in-character line.
   let user = `場面: ${ctx.situation}\n`
+  if (ctx.visual.trim()) {
+    user += `画像の内容（英語タグ・視覚情報の参考。ポーズや服装の手がかり）: ${ctx.visual.trim()}\n`
+  }
   if (ctx.samples.length) {
     user += `この場面の状況・流れ・参考メモ:\n${ctx.samples.join('\n')}\n`
   }

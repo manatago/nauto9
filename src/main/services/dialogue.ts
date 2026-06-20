@@ -45,6 +45,9 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
   const traits = char.persona.trim() || char.memo.trim() || char.prompt.trim()
   // Likewise, feed the (ideally Japanese) situation NAME, not the English prompt.
   const situation = replaceXxx((s.name.trim() || s.prompt).trim(), char.name)
+  // The English image prompt (pose/clothing/composition) as visual context — used
+  // by capable remote models (Grok); the local model ignores it to avoid English bleed.
+  const visual = replaceXxx(s.prompt.trim(), char.name)
   // Per-situation example lines (newline-separated) → few-shot tone guidance.
   const samples = s.dialogue_samples
     .split('\n')
@@ -57,6 +60,7 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
     story: story?.name ?? '',
     storyDesc: story?.description ?? '',
     situation,
+    visual,
     samples
   })
   batches.setDialogue(genId, line)
