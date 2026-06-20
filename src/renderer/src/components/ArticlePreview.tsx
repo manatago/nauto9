@@ -72,7 +72,13 @@ export default function ArticlePreview({
     const load = articleId
       ? api.articles.get(articleId).then((a) => {
           if (!a) throw new Error('記事が見つかりません')
-          return { batch_id: a.batch_id, title: a.title, intro: a.intro, blocks: a.blocks }
+          return {
+            batch_id: a.batch_id,
+            title: a.title,
+            intro: a.intro,
+            h3_mode: a.h3_mode,
+            blocks: a.blocks
+          }
         })
       : api.articles.compose(batchId as number)
     load.then((a) => alive && setArticle(a)).catch((e) => alive && setError((e as Error).message))
@@ -90,6 +96,7 @@ export default function ArticlePreview({
         batch_id: article.batch_id,
         title: article.title,
         intro: article.intro,
+        h3_mode: article.h3_mode,
         blocks: article.blocks
       })
       setSavedId(r.id)
@@ -102,6 +109,8 @@ export default function ArticlePreview({
     }
   }
 
+  const setH3Mode = (m: 'dialogue' | 'imageName'): void =>
+    setArticle((a) => (a ? { ...a, h3_mode: m } : a))
   const setTitle = (text: string): void => setArticle((a) => (a ? { ...a, title: text } : a))
   const setIntro = (text: string): void => setArticle((a) => (a ? { ...a, intro: text } : a))
   const setBlock = (id: string, text: string): void =>
@@ -144,6 +153,7 @@ export default function ArticlePreview({
       const res = await api.articles.post({
         title: article.title,
         intro: article.intro,
+        h3_mode: article.h3_mode,
         blocks: article.blocks,
         images
       })
@@ -168,6 +178,7 @@ export default function ArticlePreview({
   )
 
   function renderBlock(b: ArticleBlock): JSX.Element {
+    const imgNameIsH3 = article?.h3_mode === 'imageName'
     if (b.kind === 'image')
       return (
         <figure key={b.id} className="my-2 space-y-1">
@@ -177,8 +188,13 @@ export default function ArticlePreview({
           <input
             value={b.text}
             onChange={(e) => setBlock(b.id, e.target.value)}
-            placeholder="alt（画像名）"
-            className="mx-auto block w-full max-w-md rounded-md border border-ink-700 bg-ink-900 px-2 py-0.5 text-center text-[11px] text-ink-400 outline-none focus:border-accent/60"
+            placeholder="画像名 / alt"
+            title={imgNameIsH3 ? 'h3 見出し＋alt' : 'alt 属性'}
+            className={`mx-auto block w-full rounded-md border border-ink-700 bg-ink-900 px-2 py-0.5 outline-none focus:border-accent/60 ${
+              imgNameIsH3
+                ? 'max-w-xl text-center text-base font-semibold text-accent'
+                : 'max-w-md text-center text-[11px] text-ink-400'
+            }`}
           />
         </figure>
       )
@@ -204,16 +220,20 @@ export default function ArticlePreview({
               target: b.kind === 'h2' ? 'h2' : 'chapterDesc',
               situation_id: b.situation_id
             })
+    // In imageName mode the dialogue is not the heading — dim it.
+    const dialogueIsH3 = b.kind === 'dialogue' && !imgNameIsH3
     const cls =
       b.kind === 'h2'
         ? 'text-lg font-bold text-ink-100'
         : b.kind === 'dialogue'
-          ? 'text-base font-semibold text-accent'
+          ? dialogueIsH3
+            ? 'text-base font-semibold text-accent'
+            : 'text-sm text-ink-500'
           : 'text-sm text-ink-300'
     return (
       <div key={b.id} className="flex items-start gap-2">
         <span className="mt-1.5 w-10 shrink-0 text-[10px] uppercase text-ink-600">
-          {b.kind === 'h2' ? 'h2' : b.kind === 'dialogue' ? 'h3' : '説明'}
+          {b.kind === 'h2' ? 'h2' : b.kind === 'dialogue' ? (dialogueIsH3 ? 'h3' : 'セリフ') : '説明'}
         </span>
         <textarea
           value={b.text}
@@ -236,6 +256,22 @@ export default function ArticlePreview({
         </p>
       ) : (
         <div className="max-h-[72vh] space-y-3 overflow-y-auto pr-1">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-ink-500">見出し(h3):</span>
+            {(['dialogue', 'imageName'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setH3Mode(m)}
+                className={`rounded-md px-2.5 py-1 ${
+                  article.h3_mode === m
+                    ? 'bg-accent/20 text-accent ring-1 ring-accent/50'
+                    : 'bg-ink-700 text-ink-300'
+                }`}
+              >
+                {m === 'dialogue' ? 'セリフ' : '画像名'}
+              </button>
+            ))}
+          </div>
           <div className="flex items-start gap-2">
             <span className="mt-2 w-10 shrink-0 text-[10px] uppercase text-ink-600">題</span>
             <input

@@ -7,7 +7,8 @@ import type {
   ArticleBlock,
   ArticlePostInput,
   ArticlePostResult,
-  ArticleRegenInput
+  ArticleRegenInput,
+  H3Mode
 } from '@shared/types'
 import * as batches from '../db/batches'
 import * as sit from '../db/situations'
@@ -15,7 +16,14 @@ import * as repo from '../db/repo'
 import { generateText } from './llm'
 import { decodeDataUrl } from './images'
 import { replaceXxx } from './prompt'
-import { createDraft, uploadMedia, wpConfigFrom } from './wordpress'
+import {
+  createDraft,
+  findOrCreateTag,
+  listCategories,
+  uploadMedia,
+  wpConfigFrom,
+  type WpConfig
+} from './wordpress'
 
 // Ad-link HTML snippets (stored as a JSON array of strings in settings) inserted
 // before the 2nd and later <h2>. Returns [] if unset/invalid.
@@ -176,7 +184,19 @@ export async function composeArticle(batchId: number): Promise<Article> {
     })
   }
 
-  return { batch_id: batchId, title, intro, blocks }
+  // Ad link after the last image too.
+  if (ads.length) {
+    blocks.push({
+      id: 'ad-end',
+      kind: 'customHtml',
+      text: ads[Math.floor(Math.random() * ads.length)],
+      generation_id: null,
+      image_url: null,
+      situation_id: null
+    })
+  }
+
+  return { batch_id: batchId, title, intro, h3_mode: 'dialogue', blocks }
 }
 
 // Regenerate a single text block.
@@ -220,18 +240,22 @@ function esc(s: string): string {
 // `imageFor` resolves an image block to its <img> attributes (URL + optional WP
 // media id). Returns null to skip the image.
 export function buildArticleHtml(
-  a: { intro: string; blocks: ArticleBlock[] },
+  a: { intro: string; blocks: ArticleBlock[]; h3_mode?: H3Mode },
   imageFor: (b: ArticleBlock) => { url: string; mediaId?: number } | null
 ): string {
+  const mode: H3Mode = a.h3_mode ?? 'dialogue'
   const out: string[] = []
   if (a.intro.trim()) out.push(`<p>${esc(a.intro.trim())}</p>`)
   for (const b of a.blocks) {
     if (b.kind === 'h2') out.push(`<h2>${esc(b.text)}</h2>`)
     else if (b.kind === 'chapterDesc') out.push(`<p>${esc(b.text)}</p>`)
-    else if (b.kind === 'dialogue') out.push(`<h3>${esc(b.text)}</h3>`)
     else if (b.kind === 'customHtml') {
       if (b.text.trim()) out.push(b.text) // raw ad HTML, not escaped
+    } else if (b.kind === 'dialogue') {
+      // In imageName mode the h3 comes from the image block instead.
+      if (mode === 'dialogue') out.push(`<h3>${esc(b.text)}</h3>`)
     } else if (b.kind === 'image') {
+      if (mode === 'imageName' && b.text.trim()) out.push(`<h3>${esc(b.text)}</h3>`)
       const img = imageFor(b)
       if (img) {
         const cls = img.mediaId ? ` class="wp-image-${img.mediaId}"` : ''
@@ -267,5 +291,63 @@ export async function postArticleToWordpress(
   const html = buildArticleHtml(input, (b) =>
     b.generation_id != null ? (uploaded.get(b.generation_id) ?? null) : null
   )
-  return createDraft(cfg, input.title.trim() || '無題', html)
+
+  // Best-effort: let the LLM pick the most fitting existing category and suggest
+  // ~3 tags from the article. If anything fails, post without them.
+  const extra = await autoCategorizeAndTag(cfg, input).catch(() => ({}))
+  return createDraft(cfg, input.title.trim() || '無題', html, extra)
+}
+
+function articleExcerpt(input: ArticlePostInput): string {
+  const texts = input.blocks
+    .filter((b) => b.kind === 'h2' || b.kind === 'chapterDesc' || b.kind === 'dialogue')
+    .map((b) => b.text.trim())
+    .filter(Boolean)
+  return `タイトル: ${input.title}\n導入: ${input.intro}\n内容: ${texts.join(' / ').slice(0, 1500)}`
+}
+
+async function autoCategorizeAndTag(
+  cfg: WpConfig,
+  input: ArticlePostInput
+): Promise<{ categories?: number[]; tags?: number[] }> {
+  const excerpt = articleExcerpt(input)
+  const out: { categories?: number[]; tags?: number[] } = {}
+
+  // Category: pick the best of the existing categories by number.
+  const cats = await listCategories(cfg).catch(() => [])
+  if (cats.length) {
+    const list = cats.map((c, i) => `${i + 1}. ${c.name}`).join('\n')
+    const ans = await generateText(
+      '次の記事に最も適したカテゴリを一覧から1つ選び、その番号だけを返してください。',
+      `${excerpt}\n\nカテゴリ一覧:\n${list}`,
+      16
+    ).catch(() => '')
+    const n = parseInt((ans.match(/\d+/) ?? [])[0] ?? '', 10)
+    if (n >= 1 && n <= cats.length) out.categories = [cats[n - 1].id]
+  }
+
+  // Tags: 3 short Japanese tags from the article flow.
+  const tagLine = await generateText(
+    '記事内容に合うタグを3つ提案します。日本語の短い単語で、カンマ区切りのみ返してください（記号や番号は不要）。',
+    excerpt,
+    40
+  ).catch(() => '')
+  const names = tagLine
+    .split(/[,、\n]/)
+    .map((t) => t.replace(/^[\s#・-]+|[\s]+$/g, '').trim())
+    .filter(Boolean)
+    .slice(0, 3)
+  if (names.length) {
+    const ids: number[] = []
+    for (const name of names) {
+      try {
+        ids.push(await findOrCreateTag(cfg, name))
+      } catch {
+        /* skip a tag that fails */
+      }
+    }
+    if (ids.length) out.tags = ids
+  }
+
+  return out
 }

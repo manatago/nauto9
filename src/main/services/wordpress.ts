@@ -91,17 +91,41 @@ export async function uploadMedia(
   return { id: data.id, source_url: data.source_url }
 }
 
+// List existing categories (id + name) for auto-selection.
+export async function listCategories(cfg: WpConfig): Promise<{ id: number; name: string }[]> {
+  const res = await fetch(
+    `${cfg.siteUrl}/wp-json/wp/v2/categories?per_page=100&_fields=id,name`,
+    { headers: { Authorization: authHeader(cfg) } }
+  )
+  if (!res.ok) throw new Error(`カテゴリ取得失敗 HTTP ${res.status}`)
+  return (await res.json()) as { id: number; name: string }[]
+}
+
+// Resolve a tag name to an id, creating it if it doesn't exist.
+export async function findOrCreateTag(cfg: WpConfig, name: string): Promise<number> {
+  const found = (await (
+    await fetch(
+      `${cfg.siteUrl}/wp-json/wp/v2/tags?search=${encodeURIComponent(name)}&_fields=id,name`,
+      { headers: { Authorization: authHeader(cfg) } }
+    )
+  ).json()) as { id: number; name: string }[]
+  const exact = found.find((t) => t.name === name)
+  if (exact) return exact.id
+  const created = await postJson(`${cfg.siteUrl}/wp-json/wp/v2/tags`, cfg, { name })
+  return created.id as number
+}
+
 // Create a draft post. Returns its id and admin link.
 export async function createDraft(
   cfg: WpConfig,
   title: string,
-  contentHtml: string
+  contentHtml: string,
+  extra?: { categories?: number[]; tags?: number[] }
 ): Promise<{ id: number; link: string }> {
-  const data = await postJson(`${cfg.siteUrl}/wp-json/wp/v2/posts`, cfg, {
-    title,
-    content: contentHtml,
-    status: 'draft'
-  })
+  const body: Record<string, unknown> = { title, content: contentHtml, status: 'draft' }
+  if (extra?.categories?.length) body.categories = extra.categories
+  if (extra?.tags?.length) body.tags = extra.tags
+  const data = await postJson(`${cfg.siteUrl}/wp-json/wp/v2/posts`, cfg, body)
   const id = data.id as number
   return { id, link: `${cfg.siteUrl}/wp-admin/post.php?post=${id}&action=edit` }
 }

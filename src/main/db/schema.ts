@@ -3,7 +3,7 @@ import { rmSync } from 'fs'
 import { join } from 'path'
 import { storageRoot } from '../paths'
 
-const SCHEMA_VERSION = 13
+const SCHEMA_VERSION = 14
 
 // Simple model: a character is a single prompt + tags + reference images.
 // (The earlier clothing/state/outfit layer was removed — make separate
@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS articles (
   batch_id INTEGER REFERENCES batches(id) ON DELETE SET NULL,
   title TEXT NOT NULL DEFAULT '',
   intro TEXT NOT NULL DEFAULT '',
+  h3_mode TEXT NOT NULL DEFAULT 'dialogue',
   blocks TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -221,6 +222,10 @@ export function migrate(db: Database.Database): void {
     // Per-situation example lines (newline-separated) used as few-shot tone
     // guidance for dialogue generation.
     addColumnIfMissing(db, 'situations', 'dialogue_samples', "TEXT NOT NULL DEFAULT ''")
+  }
+  if (v < 14) {
+    // h3 heading source per saved article (dialogue line vs image name).
+    addColumnIfMissing(db, 'articles', 'h3_mode', "TEXT NOT NULL DEFAULT 'dialogue'")
   }
 
   db.pragma(`user_version = ${SCHEMA_VERSION}`)

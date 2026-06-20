@@ -185,10 +185,14 @@ export interface ArticleBlock {
   situation_id: number | null // h2 / chapterDesc — for regeneration context
 }
 
+// h3 heading source: the dialogue line, or the image name (situation name).
+export type H3Mode = 'dialogue' | 'imageName'
+
 export interface Article {
   batch_id: number | null
   title: string
   intro: string
+  h3_mode: H3Mode
   blocks: ArticleBlock[]
 }
 
@@ -208,6 +212,7 @@ export interface ArticleImageUpload {
 export interface ArticlePostInput {
   title: string
   intro: string
+  h3_mode: H3Mode
   blocks: ArticleBlock[] // edited text/structure
   images: ArticleImageUpload[]
 }
@@ -222,6 +227,7 @@ export interface SavedArticle {
   batch_id: number | null
   title: string
   intro: string
+  h3_mode: H3Mode
   blocks: ArticleBlock[]
   created_at: string
   updated_at: string
@@ -239,6 +245,7 @@ export interface ArticleSaveInput {
   batch_id: number | null
   title: string
   intro: string
+  h3_mode: H3Mode
   blocks: ArticleBlock[]
 }
 

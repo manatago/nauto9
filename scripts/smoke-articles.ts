@@ -10,10 +10,10 @@ app
       { id: 'dlg-1', kind: 'dialogue', text: 'こんにちは', generation_id: 999, image_url: null, situation_id: 1 },
       { id: 'img-1', kind: 'image', text: '', generation_id: 999, image_url: 'media://x', situation_id: 1 }
     ]
-    const a = articles.saveArticle({ batch_id: null, title: 'テスト記事', intro: '導入', blocks })
+    const a = articles.saveArticle({ batch_id: null, title: 'テスト記事', intro: '導入', h3_mode: 'dialogue', blocks })
     console.log('saved id:', a.id, '| title:', a.title, '| blocks:', a.blocks.length)
 
-    const updated = articles.saveArticle({ id: a.id, batch_id: null, title: 'テスト記事(改)', intro: '導入2', blocks })
+    const updated = articles.saveArticle({ id: a.id, batch_id: null, title: 'テスト記事(改)', intro: '導入2', h3_mode: 'imageName', blocks })
     if (updated.id !== a.id) throw new Error('update created a new row')
     console.log('updated title:', updated.title)
 

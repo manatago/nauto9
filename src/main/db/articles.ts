@@ -1,4 +1,10 @@
-import type { ArticleBlock, ArticleListItem, ArticleSaveInput, SavedArticle } from '@shared/types'
+import type {
+  ArticleBlock,
+  ArticleListItem,
+  ArticleSaveInput,
+  H3Mode,
+  SavedArticle
+} from '@shared/types'
 import { getDb } from './index'
 import { getGeneration } from './batches'
 import { now, type Row } from './util'
@@ -25,6 +31,7 @@ function toArticle(r: Row): SavedArticle {
     batch_id: (r.batch_id as number | null) ?? null,
     title: r.title as string,
     intro: r.intro as string,
+    h3_mode: ((r.h3_mode as string) || 'dialogue') as H3Mode,
     blocks: refreshBlocks(blocks),
     created_at: r.created_at as string,
     updated_at: r.updated_at as string
@@ -36,13 +43,14 @@ export function saveArticle(input: ArticleSaveInput): SavedArticle {
   const blocks = JSON.stringify(input.blocks)
   if (input.id) {
     db.prepare(
-      'UPDATE articles SET title = ?, intro = ?, blocks = ?, batch_id = ?, updated_at = ? WHERE id = ?'
-    ).run(input.title, input.intro, blocks, input.batch_id, now(), input.id)
+      'UPDATE articles SET title = ?, intro = ?, h3_mode = ?, blocks = ?, batch_id = ?, updated_at = ? WHERE id = ?'
+    ).run(input.title, input.intro, input.h3_mode, blocks, input.batch_id, now(), input.id)
     return getArticle(input.id)!
   }
   const id = db
-    .prepare('INSERT INTO articles (batch_id, title, intro, blocks) VALUES (?, ?, ?, ?)')
-    .run(input.batch_id, input.title, input.intro, blocks).lastInsertRowid as number
+    .prepare('INSERT INTO articles (batch_id, title, intro, h3_mode, blocks) VALUES (?, ?, ?, ?, ?)')
+    .run(input.batch_id, input.title, input.intro, input.h3_mode, blocks)
+    .lastInsertRowid as number
   return getArticle(id)!
 }
 
