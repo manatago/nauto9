@@ -96,15 +96,19 @@ function chatOptions(temperature: number): Record<string, unknown> {
 export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions): Promise<string> {
   if (!opts.model.trim())
     throw new Error('Ollama のモデル名が未設定です（設定画面で入力してください）')
-  let system = fillTemplate(opts.template || DEFAULT_DIALOGUE_TEMPLATE, ctx)
-  // Append per-situation example lines as few-shot tone guidance. Kept out of the
-  // editable template so it works with any template the user has customized.
+  const system = fillTemplate(opts.template || DEFAULT_DIALOGUE_TEMPLATE, ctx)
+  // Per-situation example lines go in the USER message, right before the ask —
+  // the most salient position. (In the system message they were buried after a
+  // long persona that may itself contain many example lines, and got drowned
+  // out.) The character's persona still governs the overall voice.
+  let user = `状況: ${ctx.situation}\n`
   if (ctx.samples.length) {
-    system +=
-      '\nこの状況で言いそうなセリフの例（口調と雰囲気の参考。そのまま流用せず参考にする）:\n' +
-      ctx.samples.map((s) => `- ${s}`).join('\n')
+    user +=
+      `この状況での${ctx.character}のセリフはこんな感じ（口調と雰囲気を強く参考にする。丸写しはしない）:\n` +
+      ctx.samples.map((s) => `「${s}」`).join('\n') +
+      '\n'
   }
-  const user = `状況: ${ctx.situation}\nこのときの「${ctx.character}」が言う短いセリフを1文だけ、日本語で。`
+  user += `このときの「${ctx.character}」が言う短いセリフを1文だけ、日本語で。`
   const base = (opts.url || 'http://localhost:11434').replace(/\/+$/, '')
 
   async function once(temperature: number): Promise<string> {
