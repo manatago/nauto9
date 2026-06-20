@@ -186,7 +186,7 @@ export interface ArticleBlock {
 }
 
 export interface Article {
-  batch_id: number
+  batch_id: number | null
   title: string
   intro: string
   blocks: ArticleBlock[]
@@ -215,6 +215,36 @@ export interface ArticlePostInput {
 export interface ArticlePostResult {
   id: number
   link: string // the draft's edit/preview link
+}
+
+export interface SavedArticle {
+  id: number
+  batch_id: number | null
+  title: string
+  intro: string
+  blocks: ArticleBlock[]
+  created_at: string
+  updated_at: string
+}
+
+export interface ArticleListItem {
+  id: number
+  batch_id: number | null
+  title: string
+  updated_at: string
+}
+
+export interface ArticleSaveInput {
+  id?: number // update when present, else create
+  batch_id: number | null
+  title: string
+  intro: string
+  blocks: ArticleBlock[]
+}
+
+export interface WpTestResult {
+  ok: boolean
+  name: string // the authenticated user's display name
 }
 
 // ---- IPC payloads ----
@@ -322,6 +352,13 @@ export interface Api {
     compose(batchId: number): Promise<Article> // LLM title/intro + chapters + dialogue/image blocks
     regenerate(input: ArticleRegenInput): Promise<string> // re-generate one text block
     post(input: ArticlePostInput): Promise<ArticlePostResult> // upload webp media + create a draft
+    save(input: ArticleSaveInput): Promise<SavedArticle> // persist for later editing/posting
+    list(): Promise<ArticleListItem[]> // saved drafts, newest first
+    get(id: number): Promise<SavedArticle | null> // with image URLs refreshed
+    delete(id: number): Promise<void>
+  }
+  wordpress: {
+    test(): Promise<WpTestResult> // verify site URL + credentials
   }
   settings: {
     get(key: string): Promise<string | null>

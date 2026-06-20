@@ -3,7 +3,7 @@ import { rmSync } from 'fs'
 import { join } from 'path'
 import { storageRoot } from '../paths'
 
-const SCHEMA_VERSION = 12
+const SCHEMA_VERSION = 13
 
 // Simple model: a character is a single prompt + tags + reference images.
 // (The earlier clothing/state/outfit layer was removed — make separate
@@ -117,6 +117,17 @@ CREATE TABLE IF NOT EXISTS generations (
   status TEXT NOT NULL DEFAULT 'pending',
   error TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Saved WordPress drafts composed from a batch (editable / postable later).
+CREATE TABLE IF NOT EXISTS articles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  batch_id INTEGER REFERENCES batches(id) ON DELETE SET NULL,
+  title TEXT NOT NULL DEFAULT '',
+  intro TEXT NOT NULL DEFAULT '',
+  blocks TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_images_character ON character_images(character_id);

@@ -266,9 +266,23 @@ function WpSettings(): JSX.Element {
     })
   }, [])
 
+  const [testing, setTesting] = useState(false)
+
   const save = (key: string, value: string): void => {
     setVals((s) => ({ ...s, [key]: value }))
     api.settings.set(key, value).then(() => toast.success('保存しました'))
+  }
+
+  async function test(): Promise<void> {
+    setTesting(true)
+    try {
+      const r = await api.wordpress.test()
+      toast.success(`接続OK（${r.name} として認証）`)
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setTesting(false)
+    }
   }
 
   if (!loaded) return <section />
@@ -308,6 +322,13 @@ function WpSettings(): JSX.Element {
           />
         </label>
       </div>
+      <button
+        onClick={test}
+        disabled={testing}
+        className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+      >
+        {testing ? '確認中…' : '疎通確認'}
+      </button>
     </section>
   )
 }

@@ -44,6 +44,28 @@ async function postJson(
   return (await res.json()) as Record<string, unknown>
 }
 
+// Verify the site URL + credentials by fetching the authenticated user.
+export async function testConnection(cfg: WpConfig): Promise<{ name: string }> {
+  let res: Response
+  try {
+    res = await fetch(`${cfg.siteUrl}/wp-json/wp/v2/users/me?context=edit`, {
+      headers: { Authorization: authHeader(cfg) }
+    })
+  } catch {
+    throw new Error(`サイトに接続できません（${cfg.siteUrl}）。URLを確認してください`)
+  }
+  if (res.status === 401)
+    throw new Error('認証に失敗しました（ユーザー名／アプリケーションパスワードを確認）')
+  if (res.status === 404)
+    throw new Error('REST API が見つかりません（URLが正しいか、REST が有効か確認）')
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    throw new Error(`WordPress HTTP ${res.status}: ${t.slice(0, 200)}`)
+  }
+  const data = (await res.json()) as { name?: string }
+  return { name: data.name ?? cfg.user }
+}
+
 // Upload a media file. Returns its WP id and public source URL.
 export async function uploadMedia(
   cfg: WpConfig,

@@ -71,7 +71,14 @@ const api: Api = {
   articles: {
     compose: (batchId) => invoke('articles:compose', batchId) as Promise<never>,
     regenerate: (input) => invoke('articles:regenerate', input) as Promise<never>,
-    post: (input) => invoke('articles:post', input) as Promise<never>
+    post: (input) => invoke('articles:post', input) as Promise<never>,
+    save: (input) => invoke('articles:save', input) as Promise<never>,
+    list: () => invoke('articles:list') as Promise<never>,
+    get: (id) => invoke('articles:get', id) as Promise<never>,
+    delete: (id) => invoke('articles:delete', id) as Promise<never>
+  },
+  wordpress: {
+    test: () => invoke('wordpress:test') as Promise<never>
   },
   settings: {
     get: (key) => invoke('settings:get', key) as Promise<never>,

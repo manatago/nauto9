@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { BookOpen, Images, Settings as SettingsIcon, Users, Wand2 } from 'lucide-react'
+import { BookOpen, FileText, Images, Settings as SettingsIcon, Users, Wand2 } from 'lucide-react'
 import { ToastProvider } from './components/Toast'
 import CharacterList from './views/CharacterList'
 import CharacterDetail from './views/CharacterDetail'
 import Situations from './views/Situations'
 import BatchCreate from './views/BatchCreate'
 import Gallery from './views/Gallery'
+import Articles from './views/Articles'
 import Settings from './views/Settings'
 
 type View =
@@ -14,6 +15,7 @@ type View =
   | { name: 'situations' }
   | { name: 'batch' }
   | { name: 'gallery' }
+  | { name: 'articles' }
   | { name: 'settings' }
 
 export default function App(): JSX.Element {
@@ -42,6 +44,9 @@ export default function App(): JSX.Element {
           <button onClick={() => setView({ name: 'gallery' })} className={tabClass(view.name === 'gallery')}>
             <Images size={16} /> ギャラリー
           </button>
+          <button onClick={() => setView({ name: 'articles' })} className={tabClass(view.name === 'articles')}>
+            <FileText size={16} /> 記事
+          </button>
           <button onClick={() => setView({ name: 'settings' })} className={tabClass(view.name === 'settings')}>
             <SettingsIcon size={16} /> 設定
           </button>
@@ -55,6 +60,7 @@ export default function App(): JSX.Element {
           {view.name === 'situations' && <Situations />}
           {view.name === 'batch' && <BatchCreate onCreated={() => setView({ name: 'gallery' })} />}
           {view.name === 'gallery' && <Gallery />}
+          {view.name === 'articles' && <Articles />}
           {view.name === 'settings' && <Settings />}
         </main>
       </div>

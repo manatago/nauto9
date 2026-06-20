@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, RefreshCw, Upload } from 'lucide-react'
+import { Loader2, RefreshCw, Save, Upload } from 'lucide-react'
 import type { Article, ArticleBlock } from '@shared/types'
 import { api } from '../api'
 import { useToast } from './Toast'
@@ -23,31 +23,64 @@ async function toWebp(dataUrl: string, quality = 0.9): Promise<string> {
 }
 
 interface Props {
-  batchId: number
+  batchId?: number // compose a fresh article from this batch
+  articleId?: number // or load a saved article to edit
   onClose: () => void
+  onSaved?: () => void
 }
 
-// Compose + preview a WordPress draft for one batch. Text is editable inline and
-// each piece can be regenerated. (Posting is a later step.)
-export default function ArticlePreview({ batchId, onClose }: Props): JSX.Element {
+// Compose / load + preview a WordPress draft. Text is editable inline, each piece
+// can be regenerated, and the whole article can be saved or posted as a draft.
+export default function ArticlePreview({
+  batchId,
+  articleId,
+  onClose,
+  onSaved
+}: Props): JSX.Element {
   const toast = useToast()
   const [article, setArticle] = useState<Article | null>(null)
+  const [savedId, setSavedId] = useState<number | null>(articleId ?? null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null) // 'title' | 'intro' | block id
   const [posting, setPosting] = useState<string | null>(null) // progress label while posting
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     let alive = true
     setArticle(null)
     setError(null)
-    api.articles
-      .compose(batchId)
-      .then((a) => alive && setArticle(a))
-      .catch((e) => alive && setError((e as Error).message))
+    const load = articleId
+      ? api.articles.get(articleId).then((a) => {
+          if (!a) throw new Error('記事が見つかりません')
+          return { batch_id: a.batch_id, title: a.title, intro: a.intro, blocks: a.blocks }
+        })
+      : api.articles.compose(batchId as number)
+    load.then((a) => alive && setArticle(a)).catch((e) => alive && setError((e as Error).message))
     return () => {
       alive = false
     }
-  }, [batchId])
+  }, [batchId, articleId])
+
+  async function save(): Promise<void> {
+    if (!article) return
+    setSaving(true)
+    try {
+      const r = await api.articles.save({
+        id: savedId ?? undefined,
+        batch_id: article.batch_id,
+        title: article.title,
+        intro: article.intro,
+        blocks: article.blocks
+      })
+      setSavedId(r.id)
+      onSaved?.()
+      toast.success('保存しました')
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const setTitle = (text: string): void => setArticle((a) => (a ? { ...a, title: text } : a))
   const setIntro = (text: string): void => setArticle((a) => (a ? { ...a, intro: text } : a))
@@ -128,7 +161,7 @@ export default function ArticlePreview({ batchId, onClose }: Props): JSX.Element
         ? () => api.generations.generateDialogue(b.generation_id as number).then((g) => g.dialogue)
         : () =>
             api.articles.regenerate({
-              batch_id: batchId,
+              batch_id: article?.batch_id ?? 0,
               target: b.kind === 'h2' ? 'h2' : 'chapterDesc',
               situation_id: b.situation_id
             })
@@ -171,7 +204,7 @@ export default function ArticlePreview({ batchId, onClose }: Props): JSX.Element
               onChange={(e) => setTitle(e.target.value)}
               className="flex-1 rounded-md border border-ink-700 bg-ink-900 px-2 py-1.5 text-lg font-bold outline-none focus:border-accent/60"
             />
-            <RegenBtn k="title" fn={() => api.articles.regenerate({ batch_id: batchId, target: 'title' })} />
+            <RegenBtn k="title" fn={() => api.articles.regenerate({ batch_id: article.batch_id ?? 0, target: 'title' })} />
           </div>
           <div className="flex items-start gap-2">
             <span className="mt-1.5 w-10 shrink-0 text-[10px] uppercase text-ink-600">導入</span>
@@ -181,12 +214,22 @@ export default function ArticlePreview({ batchId, onClose }: Props): JSX.Element
               rows={3}
               className="flex-1 resize-y rounded-md border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-ink-200 outline-none focus:border-accent/60"
             />
-            <RegenBtn k="intro" fn={() => api.articles.regenerate({ batch_id: batchId, target: 'intro' })} />
+            <RegenBtn k="intro" fn={() => api.articles.regenerate({ batch_id: article.batch_id ?? 0, target: 'intro' })} />
           </div>
           <hr className="border-ink-700" />
           {article.blocks.map(renderBlock)}
           <div className="flex items-center justify-end gap-3 border-t border-ink-700 pt-3">
-            <span className="text-[11px] text-ink-600">画像はwebpに変換して下書きとして投稿します</span>
+            <span className="mr-auto text-[11px] text-ink-600">
+              画像はwebpに変換して下書きとして投稿します
+            </span>
+            <button
+              onClick={save}
+              disabled={saving || posting !== null}
+              className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {savedId ? '上書き保存' : '保存'}
+            </button>
             <button
               onClick={post}
               disabled={posting !== null || busy !== null}

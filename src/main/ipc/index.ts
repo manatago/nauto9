@@ -16,6 +16,8 @@ import * as batchRepo from '../db/batches'
 import { enqueueBatch, regenerateGeneration } from '../services/batch'
 import { enqueueDialogues, generateDialogueForGeneration } from '../services/dialogue'
 import { composeArticle, postArticleToWordpress, regenerateArticleBlock } from '../services/article'
+import * as articleRepo from '../db/articles'
+import { testConnection, wpConfigFrom } from '../services/wordpress'
 import { generateImage } from '../services/novelai'
 import { buildReferenceParams, referenceMode } from '../services/reference'
 import { decodeDataUrl, mediaUrl, saveImage, saveImageWithName, thumbKey } from '../services/images'
@@ -26,6 +28,7 @@ import { posix } from 'path'
 import type {
   ArticlePostInput,
   ArticleRegenInput,
+  ArticleSaveInput,
   BatchCreateInput,
   SceneBatchCreateInput
 } from '@shared/types'
@@ -199,6 +202,19 @@ export function registerIpc(): void {
   handle('articles:compose', (batchId: number) => composeArticle(batchId))
   handle('articles:regenerate', (input: ArticleRegenInput) => regenerateArticleBlock(input))
   handle('articles:post', (input: ArticlePostInput) => postArticleToWordpress(input))
+  handle('articles:save', (input: ArticleSaveInput) => articleRepo.saveArticle(input))
+  handle('articles:list', () => articleRepo.listArticles())
+  handle('articles:get', (id: number) => articleRepo.getArticle(id))
+  handle('articles:delete', (id: number) => articleRepo.deleteArticle(id))
+  handle('wordpress:test', () =>
+    testConnection(
+      wpConfigFrom(
+        repo.getSetting('WP_SITE_URL'),
+        repo.getSetting('WP_USERNAME'),
+        repo.getSetting('WP_APP_PASSWORD')
+      )
+    )
+  )
   handle('generations:saveImage', (id: number, dataUrl: string) => {
     const g = batchRepo.getGenerationRow(id)
     if (!g) throw new Error('生成が見つかりません')
