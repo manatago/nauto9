@@ -94,47 +94,11 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
   if (!opts.model.trim())
     throw new Error('Ollama のモデル名が未設定です（設定画面で入力してください）')
   const system = fillTemplate(opts.template || DEFAULT_DIALOGUE_TEMPLATE, ctx)
-  // Content priority: the user's per-situation example lines are the MOST
-  // important driver of what's said; the situation prompt/title is secondary
-  // reference. The character's persona governs only HOW it's said (口調).
-  let scene = `この場面の状況（前後関係の参考）: ${ctx.situation}\n`
-  let seed = ''
-  if (ctx.samples.length) {
-    // Pick ONE example line and restyle only its 口調 — staying close to what the
-    // user wrote, no invented facts. Variety across images comes from WHICH line
-    // is picked (random per call). We also seed the assistant reply with the
-    // opening of the chosen line, so the model continues THAT content instead of
-    // drifting to whatever the persona suggests; the seed is prepended back.
-    const chosen = ctx.samples[Math.floor(Math.random() * ctx.samples.length)]
-    const chars = [...chosen]
-    seed = chars.slice(0, Math.max(2, Math.ceil(chars.length * 0.5))).join('')
-    scene +=
-      `次のセリフを、${ctx.character}の口調・語尾だけ整えて言い直してください。` +
-      `意味・話題は変えない。新しい事実や出来事（買い物・過去の話など）は足さない。元のセリフから大きく離れない。\n` +
-      `元のセリフ: ${chosen}`
-  } else {
-    scene += `この場面で${ctx.character}が言う短いセリフを1つ。`
-  }
-  // Mistral [INST] prompt with an assistant primer that OPENS a quote (plus the
-  // seed): the model can then only complete a spoken line. Ninja is a novel model
-  // and writes 地の文 if left free-form; opening 「 and stopping at 」 makes that
-  // structurally impossible. `raw` so our [INST] text is sent verbatim.
-  const prompt = `[INST] ${system}\n\n${scene} [/INST] ${ctx.character}「${seed}`
   const base = (opts.url || 'http://localhost:11434').replace(/\/+$/, '')
 
-  // Reconstruct the spoken line. In seed mode the completion continues after the
-  // seed, so prepend it; also drop any prompt-echo that slipped past the stops
-  // (a literal "\n口調: …" / "[INST]" the model sometimes parrots).
-  function finalize(raw: string): string {
-    if (!seed) return cleanLine(raw)
-    const head = raw
-      .split('\n')[0]
-      .split('\\n')[0]
-      .replace(/(口調|元のセリフ|\[\/?INST\]).*$/s, '')
-    return tidy(seed + head)
-  }
-
-  async function once(temperature: number): Promise<string> {
+  // Generic raw `/api/generate` completion (used for both sample selection and
+  // the dialogue line itself).
+  async function complete(promptText: string, options: Record<string, unknown>): Promise<string> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 180_000) // 12B can be slow
     let res: Response
@@ -144,11 +108,11 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: opts.model.trim(),
-          prompt,
+          prompt: promptText,
           raw: true,
           stream: false,
           keep_alive: '20m', // keep the model resident so consecutive lines don't reload it
-          options: genOptions(temperature)
+          options
         }),
         signal: controller.signal
       })
@@ -163,12 +127,79 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
       const t = await res.text().catch(() => '')
       throw new Error(`Ollama HTTP ${res.status}: ${t.slice(0, 200)}`)
     }
-    const data = (await res.json()) as { response?: string }
-    return finalize(data.response ?? '')
+    return ((await res.json()) as { response?: string }).response ?? ''
   }
 
+  // Persona-aware filter: ask the model which sample lines fit this character's
+  // personality (e.g. a 控えめ girl shouldn't say "似合ってる？"). Returns the
+  // in-character indices; falls back to all on any parse/selection failure.
+  async function appropriateIndices(): Promise<number[]> {
+    const all = ctx.samples.map((_, i) => i)
+    if (ctx.samples.length < 2) return all
+    const list = ctx.samples.map((s, i) => `${i + 1}. ${s}`).join('\n')
+    const selPrompt =
+      `[INST] 「${ctx.character}」の性格: ${ctx.traits || '（指定なし）'}\n` +
+      `この性格の${ctx.character}が、次の場面で自分から言ってもおかしくないセリフの番号だけを、合うものをカンマ区切りで挙げてください。性格に明らかに合わないものは外す。\n` +
+      `場面: ${ctx.situation}\n${list} [/INST] 合う番号: `
+    try {
+      const out = await complete(selPrompt, {
+        temperature: 0.2,
+        top_p: 0.9,
+        num_predict: 24,
+        stop: ['\n', '[INST]', '。']
+      })
+      const picked = [
+        ...new Set((out.match(/\d+/g) ?? []).map(Number))
+      ].filter((n) => n >= 1 && n <= ctx.samples.length).map((n) => n - 1)
+      return picked.length ? picked : all
+    } catch {
+      return all
+    }
+  }
+
+  // Choose ONE example line to restyle: filter to in-character lines, then pick
+  // at random among them (variety across images without going out of character).
+  let chosen = ''
+  let seed = ''
+  if (ctx.samples.length) {
+    const candidates = await appropriateIndices()
+    chosen = ctx.samples[candidates[Math.floor(Math.random() * candidates.length)]]
+    const chars = [...chosen]
+    seed = chars.slice(0, Math.max(2, Math.ceil(chars.length * 0.5))).join('')
+  }
+
+  let scene = `この場面の状況（前後関係の参考）: ${ctx.situation}\n`
+  if (chosen) {
+    scene +=
+      `次のセリフを、${ctx.character}の口調・語尾だけ整えて言い直してください。` +
+      `意味・話題は変えない。新しい事実や出来事（買い物・過去の話など）は足さない。元のセリフから大きく離れない。\n` +
+      `元のセリフ: ${chosen}`
+  } else {
+    scene += `この場面で${ctx.character}が言う短いセリフを1つ。`
+  }
+  // Mistral [INST] prompt with an assistant primer that OPENS a quote (plus the
+  // seed): the model can then only complete a spoken line. Ninja is a novel model
+  // and writes 地の文 if left free-form; opening 「 and stopping at 」 makes that
+  // structurally impossible. `raw` so our [INST] text is sent verbatim.
+  const prompt = `[INST] ${system}\n\n${scene} [/INST] ${ctx.character}「${seed}`
+
+  // Reconstruct the spoken line. In seed mode the completion continues after the
+  // seed, so prepend it; also drop any prompt-echo that slipped past the stops
+  // (a literal "\n口調: …" / "[INST]" the model sometimes parrots).
+  function finalize(raw: string): string {
+    if (!seed) return cleanLine(raw)
+    const head = raw
+      .split('\n')[0]
+      .split('\\n')[0]
+      .replace(/(口調|元のセリフ|\[\/?INST\]).*$/s, '')
+    return tidy(seed + head)
+  }
+
+  const once = async (temperature: number): Promise<string> =>
+    finalize(await complete(prompt, genOptions(temperature)))
+
   // Moderate temperature: we want a faithful restyle of the chosen line, not
-  // invention. Variety comes from the random sample pick above, so keep this low.
+  // invention. Variety comes from the sample selection above, so keep this low.
   const first = await once(0.5)
   if (!looksGarbled(first)) {
     if (!first) throw new Error('モデルが空の応答を返しました')
