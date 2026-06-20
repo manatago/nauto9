@@ -164,15 +164,18 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
   if (ctx.samples.length) {
     const candidates = await appropriateIndices()
     chosen = ctx.samples[candidates[Math.floor(Math.random() * candidates.length)]]
+    // Seed MOST of the line (~80%) so only the trailing 語尾 is rewritten: the
+    // nouns / content words stay verbatim (no "天気"→"お空") and there's no room
+    // to invent facts ("お買い物").
     const chars = [...chosen]
-    seed = chars.slice(0, Math.max(2, Math.ceil(chars.length * 0.5))).join('')
+    seed = chars.slice(0, Math.max(2, Math.ceil(chars.length * 0.8))).join('')
   }
 
   let scene = `この場面の状況（前後関係の参考）: ${ctx.situation}\n`
   if (chosen) {
     scene +=
-      `次のセリフを、${ctx.character}の口調・語尾だけ整えて言い直してください。` +
-      `意味・話題は変えない。新しい事実や出来事（買い物・過去の話など）は足さない。元のセリフから大きく離れない。\n` +
+      `次のセリフの語尾・言い方だけを${ctx.character}風に整えてください。` +
+      `名詞や内容語はそのまま使い、言い換えない。新しい情報・事実・固有名詞は足さない。元のセリフからほとんど変えない。\n` +
       `元のセリフ: ${chosen}`
   } else {
     scene += `この場面で${ctx.character}が言う短いセリフを1つ。`
@@ -195,8 +198,11 @@ export async function generateDialogue(ctx: DialogueContext, opts: OllamaOptions
     return tidy(seed + head)
   }
 
-  const once = async (temperature: number): Promise<string> =>
-    finalize(await complete(prompt, genOptions(temperature)))
+  const once = async (temperature: number): Promise<string> => {
+    const options = genOptions(temperature)
+    if (seed) options.num_predict = 28 // only the trailing 語尾 remains to write
+    return finalize(await complete(prompt, options))
+  }
 
   // Moderate temperature: we want a faithful restyle of the chosen line, not
   // invention. Variety comes from the sample selection above, so keep this low.
