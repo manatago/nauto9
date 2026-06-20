@@ -21,7 +21,7 @@ import { testConnection, wpConfigFrom } from '../services/wordpress'
 import { generateImage } from '../services/novelai'
 import { buildReferenceParams, referenceMode } from '../services/reference'
 import { decodeDataUrl, mediaUrl, saveImage, saveImageWithName, thumbKey } from '../services/images'
-import { applyCharacterReplacements, replaceXxx, stripEyeColorIfClosed } from '../services/prompt'
+import { applyCharacterReplacements, replaceXxx, stripEyeTagsIfClosed } from '../services/prompt'
 import { generationKey, safeArcName, slug } from '../services/naming'
 import { storagePathFor } from '../paths'
 import { posix } from 'path'
@@ -110,7 +110,7 @@ export function registerIpc(): void {
     const negative = [s.negative_prompt, ch.negative_prompt].filter((x) => x.trim()).join(', ')
     const png = await generateImage({
       token,
-      charPrompt: stripEyeColorIfClosed(ch.prompt, scene),
+      charPrompt: stripEyeTagsIfClosed(ch.prompt, scene),
       scenePrompt: scene,
       negativePrompt: negative,
       aspect: s.aspect_ratio
@@ -241,7 +241,7 @@ export function registerIpc(): void {
         : { mode: referenceMode(), count: 0 }
       const png = await generateImage({
         token,
-        charPrompt: stripEyeColorIfClosed(prompt, situationPrompt ?? ''),
+        charPrompt: stripEyeTagsIfClosed(prompt, situationPrompt ?? ''),
         negativePrompt: negative_prompt,
         scenePrompt: situationPrompt ?? '',
         reference: ref.params
