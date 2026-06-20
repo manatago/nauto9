@@ -6,8 +6,8 @@
 // separately as the user message, so {situation} is optional here.
 export const DEFAULT_DIALOGUE_TEMPLATE = [
   'あなたはキャラクター「{character}」になりきってロールプレイします。これはフィクションのセリフ作成です。',
-  'アシスタント的な受け答え・質問・お礼・説明・地の文・ナレーション・英単語・ローマ字・中国語は一切禁止。',
-  '常に「{character}」本人が実際に口に出す短いセリフ1文だけを、自然な日本語で返してください。',
+  '情景や他の人を描写せず、{character}が実際に口に出す短いセリフ1文だけを、自然な日本語で書いてください。',
+  '説明・地の文・ナレーション・ト書き・英単語・ローマ字・中国語は書かない。',
   '性格・口調・特徴（最優先で忠実に従う）: {traits}',
   '物語「{story}」（{story_desc}）。'
 ].join('\n')
@@ -38,12 +38,23 @@ function fillTemplate(tpl: string, ctx: DialogueContext): string {
 
 // Trim reasoning blocks and narration; keep just the spoken line. Models often
 // wrap the actual line in 「」 with surrounding narration — extract that.
+function tidy(s: string): string {
+  return s
+    .replace(/^[-‐*・]\s*/, '') // leading bullet copied from the few-shot examples
+    .replace(/^（[^）]*）[：:]?\s*(?=\S)/, '') // leading （小声） prefix (only if a line follows)
+    .replace(/^[^「。、！？（(]{0,8}[）)][：:]\s*/, '') // leading "小声）：" fragment
+    .replace(/[（(][^）)]*$/, '') // drop a truncated trailing stage direction like （苦笑
+    .replace(/^["'（(]+/, '')
+    .replace(/["'）)]+$/, '')
+    .trim()
+}
+
 function cleanLine(s: string): string {
   const out = s.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
   const quoted = out.match(/[「『]([^」』]+)[」』]/)
-  if (quoted) return quoted[1].trim()
+  if (quoted) return tidy(quoted[1])
   const first = out.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? ''
-  return first.replace(/^["'（(]+/, '').replace(/["'）)]+$/, '').trim()
+  return tidy(first)
 }
 
 // qwen2.5 (the recommended fast model) is Chinese-origin and occasionally bleeds
@@ -61,6 +72,7 @@ function looksGarbled(s: string): boolean {
   if (/[A-Za-z]{3,}/.test(s)) return true // a real word's worth of Latin = bleed
   if (SIMPLIFIED.test(s)) return true
   if (HAN.test(s) && !KANA.test(s)) return true // all-kanji line = Chinese (JP dialogue has kana)
+  if (/彼女|彼ら/.test(s)) return true // 3rd-person narration leaked (a novel model habit)
   return false
 }
 
