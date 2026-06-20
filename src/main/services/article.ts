@@ -14,7 +14,19 @@ import * as sit from '../db/situations'
 import * as repo from '../db/repo'
 import { generateText } from './llm'
 import { decodeDataUrl } from './images'
+import { replaceXxx } from './prompt'
 import { createDraft, uploadMedia, wpConfigFrom } from './wordpress'
+
+// Ad-link HTML snippets (stored as a JSON array of strings in settings) inserted
+// before the 2nd and later <h2>. Returns [] if unset/invalid.
+function adSnippets(): string[] {
+  try {
+    const arr = JSON.parse(repo.getSetting('AD_LINKS') || '[]') as unknown
+    return Array.isArray(arr) ? arr.filter((s): s is string => typeof s === 'string' && s.trim() !== '') : []
+  } catch {
+    return []
+  }
+}
 
 function storyDescription(storyId: number | null): string {
   if (!storyId) return ''
@@ -101,8 +113,10 @@ export async function composeArticle(batchId: number): Promise<Article> {
   )
 
   const gens = batch.generations.filter((g) => g.status === 'success' && g.image_url)
+  const ads = adSnippets()
   const blocks: ArticleBlock[] = []
   let lastSituationId: number | null = null
+  let h2Count = 0
 
   for (const g of gens) {
     if (g.situation_id !== lastSituationId) {
@@ -111,6 +125,18 @@ export async function composeArticle(batchId: number): Promise<Article> {
       if (s) {
         const st = parseSceneTransition(s.dialogue_samples)
         if (st.isBreak) {
+          h2Count++
+          // Ad link before every h2 except the first.
+          if (h2Count >= 2 && ads.length) {
+            blocks.push({
+              id: `ad-${s.id}`,
+              kind: 'customHtml',
+              text: ads[Math.floor(Math.random() * ads.length)],
+              generation_id: null,
+              image_url: null,
+              situation_id: s.id
+            })
+          }
           const h2 = st.title ?? (await chapterTitle(s.name, s.dialogue_samples, storyDesc))
           blocks.push({
             id: `h2-${s.id}`,
@@ -142,7 +168,8 @@ export async function composeArticle(batchId: number): Promise<Article> {
     blocks.push({
       id: `img-${g.id}`,
       kind: 'image',
-      text: '',
+      // alt = the situation name with xxx replaced by the character name.
+      text: replaceXxx(g.situation_name, g.character_name),
       generation_id: g.id,
       image_url: g.image_url,
       situation_id: g.situation_id
@@ -187,6 +214,7 @@ function esc(s: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 // `imageFor` resolves an image block to its <img> attributes (URL + optional WP
@@ -201,11 +229,13 @@ export function buildArticleHtml(
     if (b.kind === 'h2') out.push(`<h2>${esc(b.text)}</h2>`)
     else if (b.kind === 'chapterDesc') out.push(`<p>${esc(b.text)}</p>`)
     else if (b.kind === 'dialogue') out.push(`<h3>${esc(b.text)}</h3>`)
-    else if (b.kind === 'image') {
+    else if (b.kind === 'customHtml') {
+      if (b.text.trim()) out.push(b.text) // raw ad HTML, not escaped
+    } else if (b.kind === 'image') {
       const img = imageFor(b)
       if (img) {
         const cls = img.mediaId ? ` class="wp-image-${img.mediaId}"` : ''
-        out.push(`<figure><img src="${img.url}"${cls} alt="" /></figure>`)
+        out.push(`<figure><img src="${img.url}"${cls} alt="${esc(b.text)}" /></figure>`)
       }
     }
   }

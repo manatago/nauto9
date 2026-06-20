@@ -44,6 +44,26 @@ export default function ArticlePreview({
   const [busy, setBusy] = useState<string | null>(null) // 'title' | 'intro' | block id
   const [posting, setPosting] = useState<string | null>(null) // progress label while posting
   const [saving, setSaving] = useState(false)
+  const [ads, setAds] = useState<string[]>([])
+
+  useEffect(() => {
+    api.settings.get('AD_LINKS').then((v) => {
+      try {
+        const arr = JSON.parse(v || '[]')
+        setAds(Array.isArray(arr) ? arr.filter((s) => typeof s === 'string' && s.trim()) : [])
+      } catch {
+        setAds([])
+      }
+    })
+  }, [])
+
+  function pickAd(current: string): string {
+    if (!ads.length) {
+      toast.error('広告リンクが登録されていません（設定 → 広告リンク）')
+      return current
+    }
+    return ads[Math.floor(Math.random() * ads.length)]
+  }
 
   useEffect(() => {
     let alive = true
@@ -150,11 +170,30 @@ export default function ArticlePreview({
   function renderBlock(b: ArticleBlock): JSX.Element {
     if (b.kind === 'image')
       return (
-        <figure key={b.id} className="my-2">
+        <figure key={b.id} className="my-2 space-y-1">
           {b.image_url && (
-            <img src={b.image_url} className="mx-auto max-h-[40vh] rounded-lg" alt="" />
+            <img src={b.image_url} className="mx-auto max-h-[40vh] rounded-lg" alt={b.text} />
           )}
+          <input
+            value={b.text}
+            onChange={(e) => setBlock(b.id, e.target.value)}
+            placeholder="alt（画像名）"
+            className="mx-auto block w-full max-w-md rounded-md border border-ink-700 bg-ink-900 px-2 py-0.5 text-center text-[11px] text-ink-400 outline-none focus:border-accent/60"
+          />
         </figure>
+      )
+    if (b.kind === 'customHtml')
+      return (
+        <div key={b.id} className="flex items-start gap-2">
+          <span className="mt-1.5 w-10 shrink-0 text-[10px] uppercase text-ink-600">広告</span>
+          <textarea
+            value={b.text}
+            onChange={(e) => setBlock(b.id, e.target.value)}
+            rows={3}
+            className="flex-1 resize-y rounded-md border border-amber-700/50 bg-ink-900 px-2 py-1 font-mono text-xs text-amber-200/90 outline-none focus:border-accent/60"
+          />
+          <RegenBtn k={b.id} fn={() => Promise.resolve(pickAd(b.text))} />
+        </div>
       )
     const regenTarget =
       b.kind === 'dialogue'

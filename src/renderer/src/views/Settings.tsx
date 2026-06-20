@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, Plus, Trash2 } from 'lucide-react'
 import { api } from '../api'
 import { useToast } from '../components/Toast'
 
@@ -333,6 +333,74 @@ function WpSettings(): JSX.Element {
   )
 }
 
+function AdSettings(): JSX.Element {
+  const toast = useToast()
+  const [links, setLinks] = useState<string[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    api.settings.get('AD_LINKS').then((v) => {
+      try {
+        const arr = JSON.parse(v || '[]')
+        setLinks(Array.isArray(arr) ? arr.filter((s) => typeof s === 'string') : [])
+      } catch {
+        setLinks([])
+      }
+      setLoaded(true)
+    })
+  }, [])
+
+  const persist = (next: string[]): void => {
+    setLinks(next)
+    api.settings.set('AD_LINKS', JSON.stringify(next.filter((s) => s.trim()))).then(() =>
+      toast.success('保存しました')
+    )
+  }
+
+  if (!loaded) return <section />
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold text-ink-300">広告リンク（2番目以降の h2 直前に挿入）</h2>
+      <p className="text-xs text-ink-600">
+        HTML形式で複数登録できます。記事生成時、各章見出し（2番目以降）の直前にこの中からランダムで1つ挿入されます。
+      </p>
+      <div className="space-y-2 sm:max-w-xl">
+        {links.map((html, i) => (
+          <div key={i} className="flex items-start gap-2">
+            <textarea
+              defaultValue={html}
+              onBlur={(e) => {
+                if (e.target.value !== links[i]) {
+                  const next = [...links]
+                  next[i] = e.target.value
+                  persist(next)
+                }
+              }}
+              rows={2}
+              placeholder='<a href="https://...">広告</a>'
+              className="flex-1 resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 font-mono text-xs outline-none focus:border-accent/60"
+            />
+            <button
+              onClick={() => persist(links.filter((_, j) => j !== i))}
+              className="mt-1 rounded-md p-1 text-ink-500 hover:text-red-300"
+              title="削除"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={() => setLinks((l) => [...l, ''])}
+        className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-xs text-ink-200 hover:border-accent/60 hover:text-accent"
+      >
+        <Plus size={14} /> 広告を追加
+      </button>
+    </section>
+  )
+}
+
 export default function Settings(): JSX.Element {
   const toast = useToast()
   const [token, setToken] = useState('')
@@ -378,6 +446,7 @@ export default function Settings(): JSX.Element {
       <ReferenceSettings />
       <LlmSettings />
       <WpSettings />
+      <AdSettings />
     </div>
   )
 }

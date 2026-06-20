@@ -174,7 +174,7 @@ export interface SituationUpdateInput {
 
 // ---- articles (WordPress draft composition) ----
 
-export type ArticleBlockKind = 'h2' | 'chapterDesc' | 'dialogue' | 'image'
+export type ArticleBlockKind = 'h2' | 'chapterDesc' | 'dialogue' | 'image' | 'customHtml'
 
 export interface ArticleBlock {
   id: string
