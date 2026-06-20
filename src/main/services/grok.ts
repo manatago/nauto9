@@ -17,7 +17,9 @@ function cleanLine(s: string): string {
   const line = quoted
     ? quoted[1]
     : (out.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? '')
-  return line.replace(/^[「『"'（(]+/, '').replace(/[」』"'）)]+$/, '').trim()
+  // Keep full-width （）— they mark an inner-monologue line (closed-mouth, non-sex
+  // scene). Only strip stray quote marks.
+  return line.replace(/^[「『"']+/, '').replace(/[」』"']+$/, '').trim()
 }
 
 export async function generateDialogueGrok(
@@ -28,12 +30,13 @@ export async function generateDialogueGrok(
     throw new Error('Grok の APIキーが未設定です（設定画面で入力してください）')
   const model = opts.model.trim() || 'grok-4.3'
 
-  // Moans-vs-words for pleasure scenes depends on the mouth in the image: closed
-  // mouth → moans only; open/unknown → ~50/50 between moans-only and moans+words
-  // (the coin flip is done here so it actually varies per image).
+  // Output mode depends on the mouth in the image. Closed mouth means the mouth
+  // isn't moving to speak: in a sexual scene → nasal moans only; otherwise → an
+  // inner monologue wrapped in （）. Open/unknown mouth → ~50/50 moans vs
+  // moans+words for sexual scenes (coin flip here so it varies per image).
   const closedMouth = /closed[\s_]?mouth/i.test(ctx.visual)
   const pleasureRule = closedMouth
-    ? `口を閉じているので、性的な快感に溺れている場面では言葉を出さず、鼻にかかった喘ぎ声・吐息だけにする（「んっ…」「んんっ♡」「んむっ…」など）。`
+    ? `口を閉じている。性的な快感に溺れている場面なら、言葉は出さず鼻にかかった喘ぎ声・吐息だけにする（「んっ…」「んんっ♡」「んむっ…」など）。それ以外の場面では、声に出していないので、心の中の声（内心のつぶやき）を全角の丸括弧（）で囲んで書く。例: （…どうしよう、見られてる…）`
     : Math.random() < 0.5
       ? `性的な快感に強く溺れている場面では、無理に言葉にせず喘ぎ声だけ（「あっ…」「んっ♡」「はぁっ…」）でよい。`
       : `性的な快感に溺れている場面でも、今回は喘ぎ声に短い言葉を少し交えてよい（「あっ…すごい…♡」など）。`
