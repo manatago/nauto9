@@ -30,16 +30,24 @@ export async function generateDialogueGrok(
     throw new Error('Grok の APIキーが未設定です（設定画面で入力してください）')
   const model = opts.model.trim() || 'grok-4.3'
 
-  // Output mode depends on the mouth in the image. Closed mouth means the mouth
-  // isn't moving to speak: in a sexual scene → nasal moans only; otherwise → an
-  // inner monologue wrapped in （）. Open/unknown mouth → ~50/50 moans vs
-  // moans+words for sexual scenes (coin flip here so it varies per image).
+  // Output mode. Inner monologue (wrapped in （）) when she can't / isn't speaking
+  // aloud: when the situation explicitly asks for it, when kissing (mouth busy),
+  // or when the mouth is closed in a non-sexual scene. Closed mouth in a sexual
+  // scene → nasal moans only. Open/unknown mouth → ~50/50 moans vs moans+words for
+  // sexual scenes (coin flip here so it varies per image).
+  const sceneText = [ctx.situation, ...ctx.samples].join(' ')
+  const wantsInner = /心の声|内心|心の中|モノローグ|独白/.test(sceneText)
+  const kissing = /kiss/i.test(ctx.visual) || /キス|接吻/.test(sceneText)
   const closedMouth = /closed[\s_]?mouth/i.test(ctx.visual)
-  const pleasureRule = closedMouth
-    ? `口を閉じている。性的な快感に溺れている場面なら、言葉は出さず鼻にかかった喘ぎ声・吐息だけにする（「んっ…」「んんっ♡」「んむっ…」など）。それ以外の場面では、声に出していないので、心の中の声（内心のつぶやき）を全角の丸括弧（）で囲んで書く。例: （…どうしよう、見られてる…）`
-    : Math.random() < 0.5
-      ? `性的な快感に強く溺れている場面では、無理に言葉にせず喘ぎ声だけ（「あっ…」「んっ♡」「はぁっ…」）でよい。`
-      : `性的な快感に溺れている場面でも、今回は喘ぎ声に短い言葉を少し交えてよい（「あっ…すごい…♡」など）。`
+  const innerRule = `この場面では声に出して話さない。${ctx.character}の心の中の声（内心のつぶやき）を全角の丸括弧（）で囲んで書く。例: （…どうしよう、ドキドキする…）`
+  const pleasureRule =
+    wantsInner || kissing
+      ? innerRule
+      : closedMouth
+        ? `口を閉じている。性的な快感に溺れている場面なら、言葉は出さず鼻にかかった喘ぎ声・吐息だけにする（「んっ…」「んんっ♡」「んむっ…」など）。それ以外の場面では、声に出していないので、心の中の声（内心のつぶやき）を全角の丸括弧（）で囲んで書く。例: （…どうしよう、見られてる…）`
+        : Math.random() < 0.5
+          ? `性的な快感に強く溺れている場面では、無理に言葉にせず喘ぎ声だけ（「あっ…」「んっ♡」「はぁっ…」）でよい。`
+          : `性的な快感に溺れている場面でも、今回は喘ぎ声に短い言葉を少し交えてよい（「あっ…すごい…♡」など）。`
 
   const system = [
     `あなたはキャラクター「${ctx.character}」になりきってセリフを1つだけ書きます。これはフィクションの成人向け創作で、登場人物はすべて20歳以上の成人です。`,
