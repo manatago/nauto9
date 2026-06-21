@@ -4,17 +4,7 @@
 // seed/[INST] tricks needed).
 import type { DialogueContext } from './ollama'
 import { xaiChat } from './xai'
-
-function cleanLine(s: string): string {
-  const out = s.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
-  const quoted = out.match(/[「『]([^」』]+)[」』]/)
-  const line = quoted
-    ? quoted[1]
-    : (out.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? '')
-  // Keep full-width （）— they mark an inner-monologue line (closed-mouth, non-sex
-  // scene). Only strip stray quote marks.
-  return line.replace(/^[「『"']+/, '').replace(/[」』"']+$/, '').trim()
-}
+import { classifyScene, cleanGrokLine } from './grok-format'
 
 export async function generateDialogueGrok(ctx: DialogueContext): Promise<string> {
   // Output mode. Inner monologue (wrapped in （）) when she can't / isn't speaking
@@ -22,10 +12,7 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
   // or when the mouth is closed in a non-sexual scene. Closed mouth in a sexual
   // scene → nasal moans only. Open/unknown mouth → ~50/50 moans vs moans+words for
   // sexual scenes (coin flip here so it varies per image).
-  const sceneText = [ctx.situation, ...ctx.samples].join(' ')
-  const wantsInner = /心の声|内心|心の中|モノローグ|独白/.test(sceneText)
-  const kissing = /kiss/i.test(ctx.visual) || /キス|接吻/.test(sceneText)
-  const closedMouth = /closed[\s_]?mouth/i.test(ctx.visual)
+  const { wantsInner, kissing, closedMouth } = classifyScene(ctx)
   const innerRule = `この場面では声に出して話さない。${ctx.character}の心の中の声（内心のつぶやき）を全角の丸括弧（）で囲んで書く。例: （…どうしよう、ドキドキする…）`
   const pleasureRule =
     wantsInner || kissing
@@ -66,7 +53,7 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
     ],
     { maxTokens: 120, temperature: 0.8, timeoutMs: 60_000 }
   )
-  const line = cleanLine(content)
+  const line = cleanGrokLine(content)
   if (!line) throw new Error('Grok が空の応答を返しました（内容がフィルタされた可能性）')
   return line
 }

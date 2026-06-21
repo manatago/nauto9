@@ -1,9 +1,10 @@
 // Turn an (edited) article into a WordPress draft: build the post HTML, upload
 // the webp images, pick a category + tags + featured image, create the draft.
-import type { ArticleBlock, ArticlePostInput, ArticlePostResult, H3Mode } from '@shared/types'
+import type { ArticlePostInput, ArticlePostResult } from '@shared/types'
 import * as repo from '../db/repo'
 import { generateText } from './llm'
 import { decodeDataUrl } from './images'
+import { buildArticleHtml } from './article-format'
 import {
   createDraft,
   findOrCreateTag,
@@ -12,43 +13,6 @@ import {
   wpConfigFrom,
   type WpConfig
 } from './wordpress'
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-// `imageFor` resolves an image block to its <img> attributes (URL + optional WP
-// media id). Returns null to skip the image.
-export function buildArticleHtml(
-  a: { intro: string; blocks: ArticleBlock[]; h3_mode?: H3Mode },
-  imageFor: (b: ArticleBlock) => { url: string; mediaId?: number } | null
-): string {
-  const mode: H3Mode = a.h3_mode ?? 'dialogue'
-  const out: string[] = []
-  if (a.intro.trim()) out.push(`<p>${esc(a.intro.trim())}</p>`)
-  for (const b of a.blocks) {
-    if (b.kind === 'h2') out.push(`<h2>${esc(b.text)}</h2>`)
-    else if (b.kind === 'chapterDesc') out.push(`<p>${esc(b.text)}</p>`)
-    else if (b.kind === 'customHtml') {
-      if (b.text.trim()) out.push(b.text) // raw ad HTML, not escaped
-    } else if (b.kind === 'dialogue') {
-      // In imageName mode the h3 comes from the image block instead.
-      if (mode === 'dialogue') out.push(`<h3>${esc(b.text)}</h3>`)
-    } else if (b.kind === 'image') {
-      if (mode === 'imageName' && b.text.trim()) out.push(`<h3>${esc(b.text)}</h3>`)
-      const img = imageFor(b)
-      if (img) {
-        const cls = img.mediaId ? ` class="wp-image-${img.mediaId}"` : ''
-        out.push(`<figure><img src="${img.url}"${cls} alt="${esc(b.text)}" /></figure>`)
-      }
-    }
-  }
-  return out.join('\n')
-}
 
 // Upload each (webp) image to WordPress media, then create a draft post whose
 // body uses the uploaded URLs. Tags / publish date are left for the user.

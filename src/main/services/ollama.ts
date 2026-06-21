@@ -28,7 +28,7 @@ export interface OllamaOptions {
   template: string
 }
 
-function fillTemplate(tpl: string, ctx: DialogueContext): string {
+export function fillTemplate(tpl: string, ctx: DialogueContext): string {
   return tpl
     .replace(/{character}/g, ctx.character)
     .replace(/{traits}/g, ctx.traits || '（特になし）')
@@ -39,7 +39,7 @@ function fillTemplate(tpl: string, ctx: DialogueContext): string {
 
 // Trim reasoning blocks and narration; keep just the spoken line. Models often
 // wrap the actual line in 「」 with surrounding narration — extract that.
-function tidy(s: string): string {
+export function tidy(s: string): string {
   return s
     .replace(/^[-‐*・]\s*/, '') // leading bullet copied from the few-shot examples
     .replace(/^（[^）]*）[：:]?\s*(?=\S)/, '') // leading （小声） prefix (only if a line follows)
@@ -51,7 +51,7 @@ function tidy(s: string): string {
     .trim()
 }
 
-function cleanLine(s: string): string {
+export function cleanLine(s: string): string {
   const out = s.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
   const quoted = out.match(/[「『]([^」』]+)[」』]/)
   if (quoted) return tidy(quoted[1])
@@ -69,7 +69,7 @@ const HAN = /\p{Script=Han}/u
 // in an otherwise-kana line (the "应收账款…泳裤、プールサイド…" failure).
 const SIMPLIFIED =
   /[应收账款项资负债务凭证业财经济组成部门泳裤们这说没来对会觉还过吗呢给顶饮哦呀虚飞风强课东车间长发图较钟样乐书买卖见话语认识级单双问题约义习观点类别]/
-function looksGarbled(s: string): boolean {
+export function looksGarbled(s: string): boolean {
   if (!s) return true
   if (/[A-Za-z]{3,}/.test(s)) return true // a real word's worth of Latin = bleed
   if (SIMPLIFIED.test(s)) return true

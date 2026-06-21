@@ -8,6 +8,7 @@ import * as sit from '../db/situations'
 import * as repo from '../db/repo'
 import { generateText } from './llm'
 import { replaceXxx } from './prompt'
+import { parseSceneTransition } from './article-format'
 
 // Ad-link HTML snippets (stored as a JSON array of strings in settings) inserted
 // before the 2nd and later <h2>. Returns [] if unset/invalid.
@@ -23,14 +24,6 @@ function adSnippets(): string[] {
 function storyDescription(storyId: number | null): string {
   if (!storyId) return ''
   return sit.listStories().find((s) => s.id === storyId)?.description ?? ''
-}
-
-// A situation marks a chapter break when its notes contain "場面転換". An optional
-// title may follow in （）or () (full- or half-width).
-function parseSceneTransition(memo: string): { isBreak: boolean; title: string | null } {
-  if (!/場面転換/.test(memo)) return { isBreak: false, title: null }
-  const m = memo.match(/場面転換\s*[（(]\s*([^）)]*?)\s*[）)]/)
-  return { isBreak: true, title: m && m[1].trim() ? m[1].trim() : null }
 }
 
 function firstJson(s: string): { title?: string; intro?: string } | null {
