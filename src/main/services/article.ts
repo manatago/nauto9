@@ -277,6 +277,11 @@ export async function postArticleToWordpress(
     repo.getSetting('WP_APP_PASSWORD')
   )
 
+  // image name (= h3/alt) per generation, used as the media title/caption/alt.
+  const nameByGen = new Map<number, string>()
+  for (const b of input.blocks)
+    if (b.kind === 'image' && b.generation_id != null) nameByGen.set(b.generation_id, b.text)
+
   const uploaded = new Map<number, { url: string; mediaId: number }>()
   for (const img of input.images) {
     const { buf } = decodeDataUrl(img.data_url)
@@ -284,7 +289,14 @@ export async function postArticleToWordpress(
       .replace(/[^\w.-]/g, '_')
       .replace(/_+/g, '_')
     const name = safeName.endsWith('.webp') ? safeName : `${safeName}.webp`
-    const media = await uploadMedia(cfg, name, 'image/webp', buf)
+    const title = (nameByGen.get(img.generation_id) ?? '').trim()
+    const media = await uploadMedia(
+      cfg,
+      name,
+      'image/webp',
+      buf,
+      title ? { title, caption: title, altText: title } : undefined
+    )
     uploaded.set(img.generation_id, { url: media.source_url, mediaId: media.id })
   }
 
@@ -294,7 +306,12 @@ export async function postArticleToWordpress(
 
   // Best-effort: let the LLM pick the most fitting existing category and suggest
   // ~3 tags from the article. If anything fails, post without them.
-  const extra = await autoCategorizeAndTag(cfg, input).catch(() => ({}))
+  const extra: { categories?: number[]; tags?: number[]; featured_media?: number } =
+    await autoCategorizeAndTag(cfg, input).catch(() => ({}))
+  // Featured image: a random one of the uploaded images.
+  const mediaIds = [...uploaded.values()].map((u) => u.mediaId)
+  if (mediaIds.length) extra.featured_media = mediaIds[Math.floor(Math.random() * mediaIds.length)]
+
   return createDraft(cfg, input.title.trim() || '無題', html, extra)
 }
 

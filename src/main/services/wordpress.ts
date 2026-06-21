@@ -66,12 +66,14 @@ export async function testConnection(cfg: WpConfig): Promise<{ name: string }> {
   return { name: data.name ?? cfg.user }
 }
 
-// Upload a media file. Returns its WP id and public source URL.
+// Upload a media file. Returns its WP id and public source URL. Optional meta
+// (title / caption / alt) is applied with a best-effort follow-up update.
 export async function uploadMedia(
   cfg: WpConfig,
   filename: string,
   mime: string,
-  buf: Buffer
+  buf: Buffer,
+  meta?: { title?: string; caption?: string; altText?: string }
 ): Promise<{ id: number; source_url: string }> {
   const res = await fetch(`${cfg.siteUrl}/wp-json/wp/v2/media`, {
     method: 'POST',
@@ -88,6 +90,15 @@ export async function uploadMedia(
     throw new Error(`WordPress メディアアップロード失敗 HTTP ${res.status}: ${t.slice(0, 300)}`)
   }
   const data = (await res.json()) as { id: number; source_url: string }
+  if (meta && (meta.title || meta.caption || meta.altText)) {
+    await postJson(`${cfg.siteUrl}/wp-json/wp/v2/media/${data.id}`, cfg, {
+      title: meta.title,
+      caption: meta.caption,
+      alt_text: meta.altText
+    }).catch(() => {
+      /* best-effort: title/caption are optional */
+    })
+  }
   return { id: data.id, source_url: data.source_url }
 }
 
@@ -120,11 +131,12 @@ export async function createDraft(
   cfg: WpConfig,
   title: string,
   contentHtml: string,
-  extra?: { categories?: number[]; tags?: number[] }
+  extra?: { categories?: number[]; tags?: number[]; featured_media?: number }
 ): Promise<{ id: number; link: string }> {
   const body: Record<string, unknown> = { title, content: contentHtml, status: 'draft' }
   if (extra?.categories?.length) body.categories = extra.categories
   if (extra?.tags?.length) body.tags = extra.tags
+  if (extra?.featured_media) body.featured_media = extra.featured_media
   const data = await postJson(`${cfg.siteUrl}/wp-json/wp/v2/posts`, cfg, body)
   const id = data.id as number
   return { id, link: `${cfg.siteUrl}/wp-admin/post.php?post=${id}&action=edit` }
