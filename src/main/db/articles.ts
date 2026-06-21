@@ -20,7 +20,7 @@ function refreshBlocks(blocks: ArticleBlock[]): ArticleBlock[] {
 }
 
 function toArticle(r: Row): SavedArticle {
-  let blocks: ArticleBlock[] = []
+  let blocks: ArticleBlock[]
   try {
     blocks = JSON.parse((r.blocks as string) || '[]') as ArticleBlock[]
   } catch {

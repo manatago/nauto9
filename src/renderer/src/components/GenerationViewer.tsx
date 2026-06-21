@@ -124,8 +124,10 @@ export default function GenerationViewer({
       // Don't hijack keys while typing in a prompt field (space, arrows, etc.).
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
-      if (e.key === 'Escape') (mosaic ? setMosaic(false) : onClose())
-      else if (e.key === 'ArrowRight') go(1)
+      if (e.key === 'Escape') {
+        if (mosaic) setMosaic(false)
+        else onClose()
+      } else if (e.key === 'ArrowRight') go(1)
       else if (e.key === 'ArrowLeft') go(-1)
       else if (e.key === ' ' && !mosaic) {
         e.preventDefault()
