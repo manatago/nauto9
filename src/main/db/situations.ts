@@ -14,6 +14,11 @@ import { mediaUrlOrNull, now, type Row } from './util'
 
 export function listStories(): Story[] {
   const db = getDb()
+  const firstImage = db.prepare(
+    `SELECT preview_image_path FROM situations
+     WHERE story_id = ? AND preview_image_path IS NOT NULL
+     ORDER BY order_index, id LIMIT 1`
+  )
   return (db.prepare('SELECT * FROM stories ORDER BY order_index, id').all() as Row[]).map((r) => ({
     id: r.id as number,
     name: r.name as string,
@@ -22,6 +27,9 @@ export function listStories(): Story[] {
     situation_count: (
       db.prepare('SELECT COUNT(*) AS n FROM situations WHERE story_id = ?').get(r.id) as { n: number }
     ).n,
+    thumbnail_url: mediaUrlOrNull(
+      (firstImage.get(r.id) as { preview_image_path: string } | undefined)?.preview_image_path ?? null
+    ),
     created_at: r.created_at as string
   }))
 }

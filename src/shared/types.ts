@@ -66,6 +66,7 @@ export interface Story {
   description: string // story setting/context (fed to the LLM for dialogue)
   order_index: number
   situation_count: number
+  thumbnail_url: string | null // first situation's preview image (representative)
   created_at: string
 }
 
