@@ -13,10 +13,20 @@ type Sort = 'newest' | 'name' | 'outfits'
 export default function CharacterList({ onOpen }: Props): JSX.Element {
   const toast = useToast()
   const { data: characters, mutate } = useCharacters()
-  const { data: tags } = useTags()
+  const { data: tags, mutate: mutateTags } = useTags()
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('newest')
   const [filterTags, setFilterTags] = useState<number[]>([])
+  const [editTags, setEditTags] = useState(false)
+
+  async function deleteTag(id: number, name: string): Promise<void> {
+    if (!confirm(`タグ「${name}」を削除しますか？\n（このタグはすべてのキャラクターから外れます）`)) return
+    await api.tags.delete(id)
+    setFilterTags((ids) => ids.filter((x) => x !== id))
+    mutateTags()
+    mutate() // character tag chips may change
+    toast.success('タグを削除しました')
+  }
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPrompt, setNewPrompt] = useState('')
@@ -83,19 +93,41 @@ export default function CharacterList({ onOpen }: Props): JSX.Element {
         {(tags ?? []).map((t) => {
           const on = filterTags.includes(t.id)
           return (
-            <button
+            <span
               key={t.id}
-              onClick={() =>
-                setFilterTags((ids) => (on ? ids.filter((x) => x !== t.id) : [...ids, t.id]))
-              }
-              className={`rounded-full px-2.5 py-1 text-xs ${
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ${
                 on ? 'bg-accent/20 text-accent ring-1 ring-accent/50' : 'bg-ink-700 text-ink-300'
               }`}
             >
-              {t.name}
-            </button>
+              <button
+                onClick={() =>
+                  setFilterTags((ids) => (on ? ids.filter((x) => x !== t.id) : [...ids, t.id]))
+                }
+              >
+                {t.name}
+              </button>
+              {editTags && (
+                <button
+                  onClick={() => deleteTag(t.id, t.name)}
+                  title="タグを削除"
+                  className="-mr-1 rounded-full px-1 text-ink-400 hover:bg-red-500/20 hover:text-red-300"
+                >
+                  ×
+                </button>
+              )}
+            </span>
           )
         })}
+        {(tags ?? []).length > 0 && (
+          <button
+            onClick={() => setEditTags((v) => !v)}
+            className={`rounded-full px-2.5 py-1 text-xs ${
+              editTags ? 'bg-red-500/15 text-red-300 ring-1 ring-red-500/40' : 'text-ink-500 hover:text-ink-200'
+            }`}
+          >
+            {editTags ? 'タグ編集を終了' : 'タグ編集'}
+          </button>
+        )}
       </div>
 
       {filtered.length === 0 ? (
