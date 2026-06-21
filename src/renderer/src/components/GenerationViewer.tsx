@@ -298,8 +298,9 @@ export default function GenerationViewer({
 
   return createPortal(
     <div className="fixed inset-0 z-[70] flex flex-col bg-black/95">
-      {/* top bar */}
-      <div className="flex items-center gap-3 px-4 py-2 text-ink-300">
+      {/* top bar — no-drag so clicks reach it inside the title-bar strip; pl to
+          clear the macOS traffic lights */}
+      <div className="no-drag flex items-center gap-3 py-2 pl-24 pr-4 text-ink-300">
         <span className="text-sm">
           {idx + 1} / {generations.length}
         </span>

@@ -32,10 +32,10 @@ export default function App(): JSX.Element {
   return (
     <ToastProvider>
       <div className="flex h-full flex-col">
-        <header className="drag-region relative flex items-center gap-1 border-b border-ink-700 bg-ink-800/80 px-4 py-2 pl-20 backdrop-blur">
+        <header className="drag-region relative flex items-center gap-1 border-b border-ink-700 bg-ink-800/80 px-4 py-2 pl-24 backdrop-blur">
           {/* carve out the macOS traffic-light area so the native window controls
               (close / minimize / fullscreen) stay clickable */}
-          <div className="no-drag absolute inset-y-0 left-0 w-20" />
+          <div className="no-drag absolute inset-y-0 left-0 w-24" />
           <button
             onClick={() => setView({ name: 'home' })}
             className="no-drag mr-2 text-sm font-bold tracking-widest text-accent hover:opacity-80"
