@@ -38,11 +38,13 @@ export async function getAnlas(token: string): Promise<number> {
   const res = await fetch(SUBSCRIPTION_URL, { headers: headers(token) })
   if (res.status === 401) throw new Error('NovelAI トークンが無効です（401）')
   if (!res.ok) throw new Error(`NovelAI HTTP ${res.status}`)
-  const data = (await res.json()) as {
-    trainingStepsLeft?: { fixedTrainingStepsLeft?: number; purchasedTrainingStepsLeft?: number }
-  }
-  const t = data.trainingStepsLeft ?? {}
-  return (t.fixedTrainingStepsLeft ?? 0) + (t.purchasedTrainingStepsLeft ?? 0)
+  // Anlas = fixed + purchased training steps. Field names vary
+  // (fixedTrainingStepsLeft / purchasedTrainingSteps), so sum every numeric value.
+  const data = (await res.json()) as { trainingStepsLeft?: Record<string, unknown> }
+  return Object.values(data.trainingStepsLeft ?? {}).reduce<number>(
+    (sum, v) => sum + (typeof v === 'number' ? v : 0),
+    0
+  )
 }
 
 // Faithful port of nauto8 build_v45_params: scene goes in base_caption,
