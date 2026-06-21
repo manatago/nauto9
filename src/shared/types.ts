@@ -368,6 +368,9 @@ export interface Api {
   wordpress: {
     test(): Promise<WpTestResult> // verify site URL + credentials
   }
+  novelai: {
+    anlas(): Promise<number> // remaining Anlas for the account
+  }
   settings: {
     get(key: string): Promise<string | null>
     set(key: string, value: string): Promise<void>

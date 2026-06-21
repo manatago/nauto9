@@ -80,6 +80,9 @@ const api: Api = {
   wordpress: {
     test: () => invoke('wordpress:test') as Promise<never>
   },
+  novelai: {
+    anlas: () => invoke('novelai:anlas') as Promise<never>
+  },
   settings: {
     get: (key) => invoke('settings:get', key) as Promise<never>,
     set: (key, value) => invoke('settings:set', key, value) as Promise<never>

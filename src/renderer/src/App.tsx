@@ -25,17 +25,17 @@ export default function App(): JSX.Element {
 
   const isChars = view.name === 'list' || view.name === 'detail'
   const tabClass = (active: boolean): string =>
-    `flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm ${
+    `no-drag flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm ${
       active ? 'bg-ink-700 text-ink-100' : 'text-ink-400 hover:text-ink-100'
     }`
 
   return (
     <ToastProvider>
       <div className="flex h-full flex-col">
-        <header className="flex items-center gap-1 border-b border-ink-700 bg-ink-800/80 px-4 py-2 pl-20 backdrop-blur">
+        <header className="drag-region flex items-center gap-1 border-b border-ink-700 bg-ink-800/80 px-4 py-2 pl-20 backdrop-blur">
           <button
             onClick={() => setView({ name: 'home' })}
-            className="mr-2 text-sm font-bold tracking-widest text-accent hover:opacity-80"
+            className="no-drag mr-2 text-sm font-bold tracking-widest text-accent hover:opacity-80"
           >
             nauto9
           </button>

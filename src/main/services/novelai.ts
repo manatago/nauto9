@@ -3,6 +3,7 @@ import { nativeImage } from 'electron'
 
 const GENERATE_URL = 'https://image.novelai.net/ai/generate-image'
 const ENCODE_VIBE_URL = 'https://image.novelai.net/ai/encode-vibe'
+const SUBSCRIPTION_URL = 'https://api.novelai.net/user/subscription'
 const MODEL = 'nai-diffusion-4-5-full'
 
 export const DEFAULT_NEGATIVE =
@@ -29,6 +30,19 @@ function headers(token: string): Record<string, string> {
     Origin: 'https://novelai.net',
     Referer: 'https://novelai.net/'
   }
+}
+
+// Remaining Anlas (fixed + purchased training steps) for the account.
+export async function getAnlas(token: string): Promise<number> {
+  if (!token.trim()) throw new Error('NovelAI トークンが未設定です（設定画面で入力してください）')
+  const res = await fetch(SUBSCRIPTION_URL, { headers: headers(token) })
+  if (res.status === 401) throw new Error('NovelAI トークンが無効です（401）')
+  if (!res.ok) throw new Error(`NovelAI HTTP ${res.status}`)
+  const data = (await res.json()) as {
+    trainingStepsLeft?: { fixedTrainingStepsLeft?: number; purchasedTrainingStepsLeft?: number }
+  }
+  const t = data.trainingStepsLeft ?? {}
+  return (t.fixedTrainingStepsLeft ?? 0) + (t.purchasedTrainingStepsLeft ?? 0)
 }
 
 // Faithful port of nauto8 build_v45_params: scene goes in base_caption,

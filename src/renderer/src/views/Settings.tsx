@@ -380,17 +380,30 @@ export default function Settings(): JSX.Element {
   const toast = useToast()
   const [token, setToken] = useState('')
   const [tokenLoaded, setTokenLoaded] = useState(false)
+  const [anlas, setAnlas] = useState<number | null>(null)
+  const [anlasLoading, setAnlasLoading] = useState(false)
+
+  const refreshAnlas = (): void => {
+    setAnlasLoading(true)
+    api.novelai
+      .anlas()
+      .then(setAnlas)
+      .catch(() => setAnlas(null))
+      .finally(() => setAnlasLoading(false))
+  }
 
   useEffect(() => {
     api.settings.get(TOKEN_KEY).then((v) => {
       setToken(v ?? '')
       setTokenLoaded(true)
+      if (v?.trim()) refreshAnlas()
     })
   }, [])
 
   async function saveToken(): Promise<void> {
     await api.settings.set(TOKEN_KEY, token.trim())
     toast.success('トークンを保存しました')
+    refreshAnlas()
   }
 
   return (
@@ -414,6 +427,21 @@ export default function Settings(): JSX.Element {
             className="flex items-center gap-1.5 rounded-md bg-accent/20 px-3 text-sm text-accent ring-1 ring-accent/50 hover:bg-accent/30"
           >
             <Check size={15} /> 保存
+          </button>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-ink-500">
+          <span>
+            残り Anlas:{' '}
+            <span className="font-semibold text-ink-200">
+              {anlasLoading ? '確認中…' : anlas != null ? anlas.toLocaleString() : '—'}
+            </span>
+          </span>
+          <button
+            onClick={refreshAnlas}
+            disabled={anlasLoading}
+            className="rounded border border-ink-600 px-2 py-0.5 text-ink-300 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+          >
+            更新
           </button>
         </div>
       </section>

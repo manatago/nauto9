@@ -6,6 +6,15 @@
   color-scheme: dark;
 }
 
+/* Frameless window (titleBarStyle: hiddenInset): make the header draggable and
+   interactive elements inside it click-through. */
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
 html,
 body,
 #root {
