@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, Play, Wand2 } from 'lucide-react'
 import { api, useBatches, useCharacters, useSituations, useStories, useTags } from '../api'
 import { useToast } from '../components/Toast'
-import CharacterPicker from '../components/CharacterPicker'
+import CharacterCardGrid from '../components/CharacterCardGrid'
+import StoryCardGrid from '../components/StoryCardGrid'
 
 type Mode = 'story' | 'scene'
 
@@ -77,7 +78,7 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
     `flex-1 rounded-md px-3 py-1.5 text-sm ${active ? 'bg-ink-700 text-ink-100' : 'text-ink-400 hover:text-ink-100'}`
 
   return (
-    <div className="mx-auto max-w-xl px-6 py-6">
+    <div className="mx-auto max-w-2xl px-6 py-6">
       <h1 className="mb-4 text-xl font-semibold">一括生成</h1>
 
       <div className="mb-5 flex gap-1 rounded-lg border border-ink-700 bg-ink-800/50 p-1">
@@ -94,48 +95,27 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
           <>
             <div>
               <span className="mb-1 block text-xs text-ink-500">キャラクター</span>
-              <CharacterPicker
+              <CharacterCardGrid
                 characters={characters ?? []}
+                tags={tags ?? []}
                 value={characterId}
                 onChange={setCharacterId}
               />
             </div>
-            <label className="block">
+            <div>
               <span className="mb-1 block text-xs text-ink-500">ストーリー</span>
-              <select
-                value={storyId ?? ''}
-                onChange={(e) => setStoryId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm"
-              >
-                <option value="">選択してください</option>
-                {(stories ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}（{s.situation_count}）
-                  </option>
-                ))}
-              </select>
-            </label>
+              <StoryCardGrid stories={stories ?? []} value={storyId} onChange={setStoryId} />
+            </div>
             <div className="rounded-md border border-ink-700 bg-ink-900/60 px-3 py-2 text-xs text-ink-400">
               生成枚数: {story?.situation_count ?? 0} 枚
             </div>
           </>
         ) : (
           <>
-            <label className="block">
+            <div>
               <span className="mb-1 block text-xs text-ink-500">ストーリー</span>
-              <select
-                value={storyId ?? ''}
-                onChange={(e) => setStoryId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm"
-              >
-                <option value="">選択してください</option>
-                {(stories ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}（{s.situation_count}）
-                  </option>
-                ))}
-              </select>
-            </label>
+              <StoryCardGrid stories={stories ?? []} value={storyId} onChange={setStoryId} />
+            </div>
 
             {storyId != null && (
               <div>
