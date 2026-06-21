@@ -5,6 +5,35 @@ import { useToast } from '../components/Toast'
 
 const TOKEN_KEY = 'NOVELAI_API_TOKEN'
 
+// Load a group of settings keys (with defaults) and persist edits. Shared by the
+// settings sections so each doesn't re-implement the load/save boilerplate.
+function useSettingsForm(defaults: Record<string, string>): {
+  vals: Record<string, string>
+  loaded: boolean
+  save: (key: string, value: string) => void
+} {
+  const toast = useToast()
+  const [vals, setVals] = useState<Record<string, string>>({})
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    const keys = Object.keys(defaults)
+    Promise.all(keys.map((k) => api.settings.get(k))).then((got) => {
+      const next: Record<string, string> = {}
+      keys.forEach((k, i) => (next[k] = got[i] ?? defaults[k]))
+      setVals(next)
+      setLoaded(true)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const save = (key: string, value: string): void => {
+    setVals((s) => ({ ...s, [key]: value }))
+    api.settings.set(key, value).then(() => toast.success('保存しました'))
+  }
+  return { vals, loaded, save }
+}
+
 const REFERENCE_KEYS = {
   REFERENCE_MODE: 'vibe',
   VIBE_INFORMATION_EXTRACTED: '0.6',
@@ -43,26 +72,7 @@ function NumberField({
 }
 
 function ReferenceSettings(): JSX.Element {
-  const toast = useToast()
-  const [vals, setVals] = useState<Record<string, string>>({})
-  const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    const keys = Object.keys(REFERENCE_KEYS) as (keyof typeof REFERENCE_KEYS)[]
-    Promise.all(keys.map((k) => api.settings.get(k))).then((got) => {
-      const next: Record<string, string> = {}
-      keys.forEach((k, i) => (next[k] = got[i] ?? REFERENCE_KEYS[k]))
-      setVals(next)
-      setLoaded(true)
-    })
-  }, [])
-
-  async function save(key: string, value: string): Promise<void> {
-    setVals((s) => ({ ...s, [key]: value }))
-    await api.settings.set(key, value)
-    toast.success('保存しました')
-  }
-
+  const { vals, loaded, save } = useSettingsForm(REFERENCE_KEYS)
   if (!loaded) return <section />
   const mode = vals.REFERENCE_MODE
 
@@ -136,25 +146,7 @@ const LLM_KEYS = {
 } as const
 
 function LlmSettings(): JSX.Element {
-  const toast = useToast()
-  const [vals, setVals] = useState<Record<string, string>>({})
-  const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    const keys = Object.keys(LLM_KEYS) as (keyof typeof LLM_KEYS)[]
-    Promise.all(keys.map((k) => api.settings.get(k))).then((got) => {
-      const next: Record<string, string> = {}
-      keys.forEach((k, i) => (next[k] = got[i] ?? LLM_KEYS[k]))
-      setVals(next)
-      setLoaded(true)
-    })
-  }, [])
-
-  const save = (key: string, value: string): void => {
-    setVals((s) => ({ ...s, [key]: value }))
-    api.settings.set(key, value).then(() => toast.success('保存しました'))
-  }
-
+  const { vals, loaded, save } = useSettingsForm(LLM_KEYS)
   if (!loaded) return <section />
 
   const provider = vals.LLM_PROVIDER || 'local'
@@ -253,25 +245,8 @@ const WP_KEYS = {
 
 function WpSettings(): JSX.Element {
   const toast = useToast()
-  const [vals, setVals] = useState<Record<string, string>>({})
-  const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    const keys = Object.keys(WP_KEYS) as (keyof typeof WP_KEYS)[]
-    Promise.all(keys.map((k) => api.settings.get(k))).then((got) => {
-      const next: Record<string, string> = {}
-      keys.forEach((k, i) => (next[k] = got[i] ?? WP_KEYS[k]))
-      setVals(next)
-      setLoaded(true)
-    })
-  }, [])
-
+  const { vals, loaded, save } = useSettingsForm(WP_KEYS)
   const [testing, setTesting] = useState(false)
-
-  const save = (key: string, value: string): void => {
-    setVals((s) => ({ ...s, [key]: value }))
-    api.settings.set(key, value).then(() => toast.success('保存しました'))
-  }
 
   async function test(): Promise<void> {
     setTesting(true)

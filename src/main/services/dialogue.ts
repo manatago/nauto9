@@ -21,10 +21,7 @@ function ollamaOptions(): OllamaOptions {
 // Dispatch to the configured provider: local Ollama (default) or remote Grok.
 function generateLine(ctx: DialogueContext): Promise<string> {
   if ((repo.getSetting('LLM_PROVIDER') || 'local').trim() === 'grok') {
-    return generateDialogueGrok(ctx, {
-      apiKey: repo.getSetting('GROK_API_KEY') || '',
-      model: repo.getSetting('GROK_MODEL') || 'grok-4.3'
-    })
+    return generateDialogueGrok(ctx)
   }
   return generateDialogue(ctx, ollamaOptions())
 }
