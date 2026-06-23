@@ -71,7 +71,11 @@ export default function App(): JSX.Element {
           )}
           {view.name === 'list' && <CharacterList onOpen={(id) => setView({ name: 'detail', id })} />}
           {view.name === 'detail' && (
-            <CharacterDetail characterId={view.id} onBack={() => setView({ name: 'list' })} />
+            <CharacterDetail
+              characterId={view.id}
+              onBack={() => setView({ name: 'list' })}
+              onSelect={(id) => setView({ name: 'detail', id })}
+            />
           )}
           {view.name === 'situations' && <Situations />}
           {view.name === 'batch' && <BatchCreate onCreated={() => setView({ name: 'gallery' })} />}

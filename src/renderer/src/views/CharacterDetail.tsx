@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Sparkles, Star, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Star, Trash2 } from 'lucide-react'
 import type { CharacterUpdateInput, PromptReplacement } from '@shared/types'
-import { api, fileToDataUrl, useCharacter, useTags } from '../api'
+import { api, fileToDataUrl, useCharacter, useCharacters, useTags } from '../api'
 import { useToast } from '../components/Toast'
 import ImageGallery from '../components/ImageGallery'
 import Modal from '../components/Modal'
@@ -11,12 +11,31 @@ import ReplacementsEditor from '../components/ReplacementsEditor'
 interface Props {
   characterId: number
   onBack: () => void
+  onSelect?: (id: number) => void // navigate to another character without closing
 }
 
-export default function CharacterDetail({ characterId, onBack }: Props): JSX.Element {
+export default function CharacterDetail({ characterId, onBack, onSelect }: Props): JSX.Element {
   const toast = useToast()
   const { data: character, mutate } = useCharacter(characterId)
+  const { data: list } = useCharacters()
   const { data: tags, mutate: mutateTags } = useTags()
+
+  // Prev/next in the (default) character list order — like the gallery viewer.
+  const idx = list?.findIndex((c) => c.id === characterId) ?? -1
+  const prev = idx > 0 ? (list as NonNullable<typeof list>)[idx - 1] : null
+  const next = list && idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null
+
+  useEffect(() => {
+    if (!onSelect) return
+    const onKey = (e: KeyboardEvent): void => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (e.key === 'ArrowLeft' && prev) onSelect(prev.id)
+      else if (e.key === 'ArrowRight' && next) onSelect(next.id)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onSelect, prev, next])
 
   const [name, setName] = useState('')
   const [prompt, setPrompt] = useState('')
@@ -121,6 +140,31 @@ export default function CharacterDetail({ characterId, onBack }: Props): JSX.Ele
         >
           <ArrowLeft size={16} /> 一覧へ戻る
         </button>
+        {onSelect && (
+          <div className="ml-auto flex items-center gap-1">
+            {idx >= 0 && list && (
+              <span className="mr-1 text-xs text-ink-600">
+                {idx + 1} / {list.length}
+              </span>
+            )}
+            <button
+              onClick={() => prev && onSelect(prev.id)}
+              disabled={!prev}
+              title="前のキャラ (←)"
+              className="rounded-md border border-ink-600 p-1 text-ink-300 hover:border-accent/60 hover:text-accent disabled:opacity-30"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={() => next && onSelect(next.id)}
+              disabled={!next}
+              title="次のキャラ (→)"
+              className="rounded-md border border-ink-600 p-1 text-ink-300 hover:border-accent/60 hover:text-accent disabled:opacity-30"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr]">
