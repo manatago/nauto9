@@ -238,14 +238,20 @@ export function registerIpc(): void {
     async (characterId: number, situationPrompt?: string): Promise<PreviewResult> => {
       const token = repo.getSetting('NOVELAI_API_TOKEN') ?? ''
       const { prompt, negative_prompt } = repo.characterPrompt(characterId)
+      // Scene = the (optional) situation prompt + a saved test-shot prompt that
+      // the user keeps in settings (e.g. quality tags / a default pose).
+      const scene = [situationPrompt, repo.getSetting('PREVIEW_PROMPT')]
+        .map((x) => (x ?? '').trim())
+        .filter(Boolean)
+        .join(', ')
       const ref = token
         ? await buildReferenceParams(characterId, prompt, token)
         : { mode: referenceMode(), count: 0 }
       const png = await generateImage({
         token,
-        charPrompt: stripEyeTagsIfClosed(prompt, situationPrompt ?? ''),
+        charPrompt: stripEyeTagsIfClosed(prompt, scene),
         negativePrompt: negative_prompt,
-        scenePrompt: situationPrompt ?? '',
+        scenePrompt: scene,
         reference: ref.params
       })
       const key = saveImage(`characters/${characterId}/_previews`, png, 'png')

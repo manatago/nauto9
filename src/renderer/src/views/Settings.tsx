@@ -308,6 +308,26 @@ function WpSettings(): JSX.Element {
   )
 }
 
+function PreviewSettings(): JSX.Element {
+  const { vals, loaded, save } = useSettingsForm({ PREVIEW_PROMPT: '' })
+  if (!loaded) return <section />
+  return (
+    <section className="space-y-2">
+      <h2 className="text-sm font-semibold text-ink-300">キャラ試し撃ち（プレビュー）</h2>
+      <p className="text-xs text-ink-600">
+        キャラ詳細の「プレビュー生成」時に、シーンとして追加するプロンプト（品質タグや既定のポーズなど）。
+      </p>
+      <textarea
+        defaultValue={vals.PREVIEW_PROMPT}
+        onBlur={(e) => e.target.value !== vals.PREVIEW_PROMPT && save('PREVIEW_PROMPT', e.target.value)}
+        rows={2}
+        placeholder="例: cowboy shot, standing, simple background, looking at viewer"
+        className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60 sm:max-w-lg"
+      />
+    </section>
+  )
+}
+
 function AdSettings(): JSX.Element {
   const toast = useToast()
   const [links, setLinks] = useState<string[]>([])
@@ -447,6 +467,7 @@ export default function Settings(): JSX.Element {
       </section>
 
       <ReferenceSettings />
+      <PreviewSettings />
       <LlmSettings />
       <WpSettings />
       <AdSettings />
