@@ -56,7 +56,8 @@ describe('fillTemplate', () => {
       storyDesc: '',
       situation: 'プール',
       visual: '',
-      samples: []
+      samples: [],
+      avoid: []
     })
     expect(out).toBe('撫子/（特になし）/（未設定）/（説明なし）/プール')
   })

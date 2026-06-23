@@ -50,6 +50,8 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
     .split('\n')
     .map((l) => replaceXxx(l.trim(), char.name))
     .filter((l) => l.length > 0 && !/場面転換/.test(l)) // 場面転換 markers are for article chapters, not dialogue
+  // Lines already used on other images in this batch — avoid repeating them.
+  const avoid = batches.dialoguesInBatch(g.batch_id, genId)
 
   const line = await generateLine({
     character: char.name,
@@ -58,7 +60,8 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
     storyDesc: story?.description ?? '',
     situation,
     visual,
-    samples
+    samples,
+    avoid
   })
   batches.setDialogue(genId, line)
 }

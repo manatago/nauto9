@@ -288,6 +288,18 @@ export function setDialogue(id: number, text: string): void {
   getDb().prepare('UPDATE generations SET dialogue = ? WHERE id = ?').run(text, id)
 }
 
+// Lines already assigned to OTHER images in the same batch — so a freshly
+// generated line can avoid repeating them within the project.
+export function dialoguesInBatch(batchId: number, excludeGenId: number): string[] {
+  return (
+    getDb()
+      .prepare(
+        "SELECT dialogue FROM generations WHERE batch_id = ? AND id != ? AND TRIM(dialogue) != ''"
+      )
+      .all(batchId, excludeGenId) as { dialogue: string }[]
+  ).map((r) => r.dialogue)
+}
+
 // Success generations of a batch in order — for dialogue generation / posting.
 export function successGenerationIds(batchId: number): number[] {
   return (

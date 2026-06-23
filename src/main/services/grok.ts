@@ -28,7 +28,8 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
     `出力は${ctx.character}が口に出すセリフ本文のみ。説明・地の文・ナレーション・かぎ括弧（「」）は付けない。`,
     `自分の状況・見た目・していることをセリフで説明したり実況したりしない（「〜しているところ」「私は今〜」のような描写は禁止）。その瞬間にポロッと自然に口から出る一言にする。`,
     pleasureRule,
-    `性格・口調・話し方はこの設定に強く従う: ${ctx.traits || '（指定なし）'}`,
+    `口調・話し方はこの設定を参考にする: ${ctx.traits || '（指定なし）'}`,
+    `ただし日本語として自然に。主語や相手への呼びかけ（「お兄ちゃん」など）は、入れた方が自然なときだけ使う。日本語で省略するのが自然な主語・目的語は省く。設定の口癖を毎回むりやり詰め込まない。`,
     `物語「${ctx.story || '（未設定）'}」（${ctx.storyDesc || '説明なし'}）`
   ].join('\n')
 
@@ -42,9 +43,15 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
   if (ctx.samples.length) {
     user += `状況・流れ・メモ:\n${ctx.samples.join('\n')}\n`
   }
+  if (ctx.avoid.length) {
+    user +=
+      `すでに他の画像で使ったセリフ（被らないよう、言い回しも内容も変える）:\n` +
+      ctx.avoid.map((a) => `- ${a}`).join('\n') +
+      '\n'
+  }
   user +=
     `\nこの場面で${ctx.character}がその場でふと口にする自然なセリフを1つだけ書いてください。` +
-    `状況の説明や実況ではなく、その瞬間の一言。${ctx.character}の性格・口調で。セリフ本文だけを返す。`
+    `状況の説明や実況ではなく、その瞬間の一言。${ctx.character}の口調で、日本語として自然に。セリフ本文だけを返す。`
 
   const content = await xaiChat(
     [

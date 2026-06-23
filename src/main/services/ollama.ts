@@ -20,6 +20,7 @@ export interface DialogueContext {
   situation: string
   visual: string // the situation's image prompt (pose/clothing/composition) — visual context
   samples: string[] // example lines for this situation (few-shot tone guidance)
+  avoid: string[] // lines already used elsewhere in the batch — don't repeat them
 }
 
 export interface OllamaOptions {
