@@ -1,10 +1,10 @@
 import heroUrl from '../assets/hero.png'
-import listIcon from '../assets/icons/list.png'
-import situationsIcon from '../assets/icons/situations.png'
-import batchIcon from '../assets/icons/batch.png'
-import galleryIcon from '../assets/icons/gallery.png'
-import articlesIcon from '../assets/icons/articles.png'
-import settingsIcon from '../assets/icons/settings.png'
+import listIcon from '../assets/icons/list.webp'
+import situationsIcon from '../assets/icons/situations.webp'
+import batchIcon from '../assets/icons/batch.webp'
+import galleryIcon from '../assets/icons/gallery.webp'
+import articlesIcon from '../assets/icons/articles.webp'
+import settingsIcon from '../assets/icons/settings.webp'
 
 export type HomeTarget = 'list' | 'situations' | 'batch' | 'gallery' | 'articles' | 'settings'
 
@@ -42,10 +42,11 @@ export default function Home({ onNavigate }: Props): JSX.Element {
             onClick={() => onNavigate(target)}
             className="group relative aspect-square overflow-hidden rounded-2xl ring-1 ring-ink-700 transition hover:ring-accent/60"
           >
+            {/* scaled up ~1.4x so ~15% of each edge is cropped by the rounded card */}
             <img
               src={img}
               alt={label}
-              className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-105"
+              className="absolute inset-0 h-full w-full scale-[1.4] object-cover transition duration-300 group-hover:scale-[1.5]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-ink-900/90 via-ink-900/10 to-transparent" />
             <div className="absolute bottom-0 left-0 p-3 text-left">
