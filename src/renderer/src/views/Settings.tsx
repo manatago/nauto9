@@ -1,9 +1,45 @@
-import { useEffect, useState } from 'react'
-import { Check, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { api } from '../api'
 import { useToast } from '../components/Toast'
 
 const TOKEN_KEY = 'NOVELAI_API_TOKEN'
+
+// Collapsible settings card — header (title) toggles a smooth grid-rows expand.
+function SettingsCard({
+  title,
+  defaultOpen = false,
+  children
+}: {
+  title: string
+  defaultOpen?: boolean
+  children: ReactNode
+}): JSX.Element {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="overflow-hidden rounded-xl border border-ink-700 bg-ink-800/40">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-ink-800/60"
+      >
+        <span className="text-sm font-semibold text-ink-200">{title}</span>
+        <ChevronDown
+          size={18}
+          className={`ml-auto shrink-0 text-ink-500 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+          open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="px-4 pb-4">{children}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // Load a group of settings keys (with defaults) and persist edits. Shared by the
 // settings sections so each doesn't re-implement the load/save boilerplate.
@@ -73,12 +109,11 @@ function NumberField({
 
 function ReferenceSettings(): JSX.Element {
   const { vals, loaded, save } = useSettingsForm(REFERENCE_KEYS)
-  if (!loaded) return <section />
+  if (!loaded) return <></>
   const mode = vals.REFERENCE_MODE
 
   return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-ink-300">参照画像の生成への反映</h2>
+    <div className="space-y-3">
       <p className="text-xs text-ink-600">
         「参照ON」にした画像をプレビュー生成へ送ります。Vibe Transfer か精密参照を選べます。
       </p>
@@ -132,7 +167,7 @@ function ReferenceSettings(): JSX.Element {
           </label>
         </div>
       )}
-    </section>
+    </div>
   )
 }
 
@@ -147,13 +182,12 @@ const LLM_KEYS = {
 
 function LlmSettings(): JSX.Element {
   const { vals, loaded, save } = useSettingsForm(LLM_KEYS)
-  if (!loaded) return <section />
+  if (!loaded) return <></>
 
   const provider = vals.LLM_PROVIDER || 'local'
 
   return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-ink-300">文章生成（LLM）</h2>
+    <div className="space-y-3">
       <label className="block sm:max-w-xs">
         <span className="mb-1 block text-xs text-ink-500">生成エンジン</span>
         <select
@@ -233,7 +267,7 @@ function LlmSettings(): JSX.Element {
           className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60"
         />
       </label>
-    </section>
+    </div>
   )
 }
 
@@ -260,11 +294,10 @@ function WpSettings(): JSX.Element {
     }
   }
 
-  if (!loaded) return <section />
+  if (!loaded) return <></>
 
   return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-ink-300">WordPress 投稿</h2>
+    <div className="space-y-3">
       <p className="text-xs text-ink-600">
         記事を下書きとして投稿します。認証はアプリケーションパスワード（ユーザー → プロフィール → アプリケーションパスワード）。
       </p>
@@ -304,16 +337,15 @@ function WpSettings(): JSX.Element {
       >
         {testing ? '確認中…' : '疎通確認'}
       </button>
-    </section>
+    </div>
   )
 }
 
 function PreviewSettings(): JSX.Element {
   const { vals, loaded, save } = useSettingsForm({ PREVIEW_PROMPT: '' })
-  if (!loaded) return <section />
+  if (!loaded) return <></>
   return (
-    <section className="space-y-2">
-      <h2 className="text-sm font-semibold text-ink-300">キャラ試し撃ち（プレビュー）</h2>
+    <div className="space-y-2">
       <p className="text-xs text-ink-600">
         キャラ詳細の「プレビュー生成」時に、シーンとして追加するプロンプト（品質タグや既定のポーズなど）。
       </p>
@@ -324,7 +356,7 @@ function PreviewSettings(): JSX.Element {
         placeholder="例: cowboy shot, standing, simple background, looking at viewer"
         className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60 sm:max-w-lg"
       />
-    </section>
+    </div>
   )
 }
 
@@ -352,11 +384,10 @@ function AdSettings(): JSX.Element {
     )
   }
 
-  if (!loaded) return <section />
+  if (!loaded) return <></>
 
   return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-ink-300">広告リンク（2番目以降の h2 直前に挿入）</h2>
+    <div className="space-y-3">
       <p className="text-xs text-ink-600">
         HTML形式で複数登録できます。記事生成時、各章見出し（2番目以降）の直前にこの中からランダムで1つ挿入されます。
       </p>
@@ -392,7 +423,7 @@ function AdSettings(): JSX.Element {
       >
         <Plus size={14} /> 広告を追加
       </button>
-    </section>
+    </div>
   )
 }
 
@@ -427,12 +458,11 @@ export default function Settings(): JSX.Element {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 px-6 py-6">
-      <h1 className="text-xl font-semibold">設定</h1>
+    <div className="mx-auto max-w-3xl space-y-3 px-6 py-6">
+      <h1 className="mb-2 text-xl font-semibold">設定</h1>
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-ink-300">NovelAI トークン</h2>
-        <p className="text-xs text-ink-600">プレビュー生成に必要です。ローカルの DB に保存されます。</p>
+      <SettingsCard title="NovelAI トークン" defaultOpen>
+        <p className="mb-2 text-xs text-ink-600">プレビュー生成に必要です。ローカルの DB に保存されます。</p>
         <div className="flex gap-2">
           <input
             type="password"
@@ -464,13 +494,23 @@ export default function Settings(): JSX.Element {
             更新
           </button>
         </div>
-      </section>
+      </SettingsCard>
 
-      <ReferenceSettings />
-      <PreviewSettings />
-      <LlmSettings />
-      <WpSettings />
-      <AdSettings />
+      <SettingsCard title="参照画像の生成への反映">
+        <ReferenceSettings />
+      </SettingsCard>
+      <SettingsCard title="キャラ試し撃ち（プレビュー）">
+        <PreviewSettings />
+      </SettingsCard>
+      <SettingsCard title="文章生成（LLM）">
+        <LlmSettings />
+      </SettingsCard>
+      <SettingsCard title="WordPress 投稿">
+        <WpSettings />
+      </SettingsCard>
+      <SettingsCard title="広告リンク（2番目以降の h2 直前に挿入）">
+        <AdSettings />
+      </SettingsCard>
     </div>
   )
 }
