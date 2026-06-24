@@ -5,6 +5,7 @@ const GENERATE_URL = 'https://image.novelai.net/ai/generate-image'
 const ENCODE_VIBE_URL = 'https://image.novelai.net/ai/encode-vibe'
 const SUBSCRIPTION_URL = 'https://api.novelai.net/user/subscription'
 const MODEL = 'nai-diffusion-4-5-full'
+const INPAINT_MODEL = 'nai-diffusion-4-5-full-inpainting'
 
 export const DEFAULT_NEGATIVE =
   'nsfw, lowres, {bad}, error, fewer, extra, missing, worst quality, jpeg artifacts, ' +
@@ -231,14 +232,51 @@ export async function generateImage(opts: GenerateOptions): Promise<Buffer> {
     seed
   )
   if (opts.reference) Object.assign(params, opts.reference)
-  const payload = JSON.stringify({ model: MODEL, parameters: params })
+  return postGenerate(opts.token, JSON.stringify({ model: MODEL, parameters: params }))
+}
 
+export interface InpaintOptions {
+  token: string
+  imageBase64: string // source image (base64, no data: prefix)
+  maskBase64: string // black/white mask (white = redraw)
+  width: number
+  height: number
+  charPrompt: string
+  scenePrompt?: string
+  negativePrompt?: string
+  seed?: number
+}
+
+// Regenerate only the masked region of an image (NovelAI infill).
+export async function inpaint(opts: InpaintOptions): Promise<Buffer> {
+  if (!opts.token) throw new Error('NovelAI トークンが設定されていません（設定画面で入力してください）')
+  const seed = opts.seed ?? Math.floor(Math.random() * (2 ** 31 - 1))
+  const params = buildParams(
+    opts.width,
+    opts.height,
+    opts.scenePrompt ?? '',
+    opts.negativePrompt ?? '',
+    opts.charPrompt,
+    seed
+  )
+  params.action = 'infill'
+  params.add_original_image = true // composite the unmasked area back from the original
+  params.image = opts.imageBase64
+  params.mask = opts.maskBase64
+  return postGenerate(
+    opts.token,
+    JSON.stringify({ model: INPAINT_MODEL, action: 'infill', parameters: params })
+  )
+}
+
+// POST a generate/infill payload, retrying on 429/5xx, and extract the PNG.
+async function postGenerate(token: string, payload: string): Promise<Buffer> {
   let lastErr: Error | null = null
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(GENERATE_URL, {
         method: 'POST',
-        headers: headers(opts.token),
+        headers: headers(token),
         body: payload
       })
       if (res.status === 402) throw new Error('Anlas が不足しています (402)')

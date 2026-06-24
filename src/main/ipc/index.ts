@@ -20,7 +20,7 @@ import { postArticleToWordpress } from '../services/article-post'
 import * as articleRepo from '../db/articles'
 import { testConnection, wpConfigFrom } from '../services/wordpress'
 import { testApiKey } from '../services/xai'
-import { generateImage, getAnlas } from '../services/novelai'
+import { generateImage, getAnlas, inpaint } from '../services/novelai'
 import { buildReferenceParams, referenceMode } from '../services/reference'
 import { decodeDataUrl, mediaUrl, saveImage, saveImageWithName, thumbKey } from '../services/images'
 import { applyCharacterReplacements, replaceXxx, stripEyeTagsIfClosed } from '../services/prompt'
@@ -226,6 +226,47 @@ export function registerIpc(): void {
     const { buf } = decodeDataUrl(dataUrl)
     const key = generationKey(name, g.seq, replaceXxx(g.situation_name, g.character_name))
     saveImageWithName(posix.dirname(key), posix.basename(key), buf)
+    batchRepo.setGenerationImage(id, key)
+    return batchRepo.getGeneration(id)
+  })
+
+  // Inpaint: regenerate only the masked region (NovelAI infill). `maskDataUrl` is a
+  // black/white PNG (white = redraw); `extraPrompt` adds to the scene for the region.
+  handle('generations:inpaint', async (id: number, maskDataUrl: string, extraPrompt: string) => {
+    const g = batchRepo.getGeneration(id)
+    if (!g || !g.image_path) throw new Error('生成画像が見つかりません')
+    const char = g.character_id ? repo.getCharacter(g.character_id) : null
+    const s = g.situation_id ? sit.getSituation(g.situation_id) : null
+    if (!char) throw new Error('キャラクターが見つかりません（削除された可能性）')
+    if (!s) throw new Error('シチュエーションが見つかりません（削除された可能性）')
+    const token = repo.getSetting('NOVELAI_API_TOKEN') ?? ''
+    const b = batchRepo.getBatchRow(g.batch_id)
+    const base = b?.prefix_prompt?.trim() ? `${b.prefix_prompt.trim()}, ${s.prompt}` : s.prompt
+    let scene = applyCharacterReplacements(replaceXxx(base, char.name), char.prompt_replacements)
+    if ((extraPrompt ?? '').trim()) scene = `${scene}, ${extraPrompt.trim()}`
+    const charPrompt = stripEyeTagsIfClosed(char.prompt, scene)
+    const negative = [s.negative_prompt, char.negative_prompt]
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .join(', ')
+
+    const srcBuf = readFileSync(storagePathFor(g.image_path))
+    const { width, height } = nativeImage.createFromBuffer(srcBuf).getSize()
+    const { buf: maskBuf } = decodeDataUrl(maskDataUrl)
+    const png = await inpaint({
+      token,
+      imageBase64: srcBuf.toString('base64'),
+      maskBase64: maskBuf.toString('base64'),
+      width,
+      height,
+      charPrompt,
+      scenePrompt: scene,
+      negativePrompt: negative
+    })
+
+    const name = batchRepo.batchName(g.batch_id) ?? 'batch'
+    const key = generationKey(name, g.seq, replaceXxx(g.situation_name, g.character_name))
+    saveImageWithName(posix.dirname(key), posix.basename(key), png)
     batchRepo.setGenerationImage(id, key)
     return batchRepo.getGeneration(id)
   })

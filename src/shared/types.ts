@@ -352,6 +352,7 @@ export interface Api {
     regenerate(id: number): Promise<Generation> // re-run the same character × situation
     imageData(id: number): Promise<string> // data: URL (clean for canvas editing)
     saveImage(id: number, dataUrl: string): Promise<Generation> // save edited (mosaic) image
+    inpaint(id: number, maskDataUrl: string, prompt: string): Promise<Generation> // redraw masked region
     generateDialogue(id: number): Promise<Generation> // LLM line for one image
     setDialogue(id: number, text: string): Promise<Generation> // manual edit
   }

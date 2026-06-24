@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Paintbrush,
   Pause,
   Pencil,
   Play,
@@ -78,6 +79,9 @@ export default function GenerationViewer({
   const [idx, setIdx] = useState(index)
   const [playing, setPlaying] = useState(false)
   const [mosaic, setMosaic] = useState(false)
+  const [inpaint, setInpaint] = useState(false)
+  const [inpaintPrompt, setInpaintPrompt] = useState('')
+  const [brush, setBrush] = useState(48)
   const [busy, setBusy] = useState(false)
   // Previous image data, kept only right after a regenerate (1-step undo).
   // Cleared on navigation / close.
@@ -90,15 +94,17 @@ export default function GenerationViewer({
   const [dialogue, setDialogue] = useState('')
   const [dlgBusy, setDlgBusy] = useState(false) // separate so its spinner shows on the right button
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const maskRef = useRef<HTMLCanvasElement>(null)
   const dragRef = useRef<{ x: number; y: number } | null>(null)
+  const paintRef = useRef<{ x: number; y: number } | null>(null)
 
   const cur = generations[idx]
   const go = useCallback(
     (d: number) => {
-      if (mosaic) return
+      if (mosaic || inpaint) return
       setIdx((i) => (i + d + generations.length) % generations.length)
     },
-    [generations.length, mosaic]
+    [generations.length, mosaic, inpaint]
   )
 
   // The undo is only valid for the image just regenerated; drop it on move.
@@ -113,10 +119,10 @@ export default function GenerationViewer({
 
   // slideshow auto-advance
   useEffect(() => {
-    if (!playing || mosaic) return
+    if (!playing || mosaic || inpaint) return
     const t = setInterval(() => setIdx((i) => (i + 1) % generations.length), 3000)
     return () => clearInterval(t)
-  }, [playing, mosaic, generations.length])
+  }, [playing, mosaic, inpaint, generations.length])
 
   // keyboard
   useEffect(() => {
@@ -126,21 +132,22 @@ export default function GenerationViewer({
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
       if (e.key === 'Escape') {
         if (mosaic) setMosaic(false)
+        else if (inpaint) setInpaint(false)
         else onClose()
       } else if (e.key === 'ArrowRight') go(1)
       else if (e.key === 'ArrowLeft') go(-1)
-      else if (e.key === ' ' && !mosaic) {
+      else if (e.key === ' ' && !mosaic && !inpaint) {
         e.preventDefault()
         setPlaying((p) => !p)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [go, mosaic, onClose])
+  }, [go, mosaic, inpaint, onClose])
 
-  // load the current image into the canvas when entering mosaic mode
+  // load the current image into the canvas when entering mosaic / inpaint mode
   useEffect(() => {
-    if (!mosaic || !cur) return
+    if ((!mosaic && !inpaint) || !cur) return
     let alive = true
     api.generations.imageData(cur.id).then((dataUrl) => {
       if (!alive) return
@@ -151,13 +158,20 @@ export default function GenerationViewer({
         canvas.width = img.naturalWidth
         canvas.height = img.naturalHeight
         canvas.getContext('2d')?.drawImage(img, 0, 0)
+        // inpaint: a transparent mask layer the same size as the image
+        const mask = maskRef.current
+        if (inpaint && mask) {
+          mask.width = img.naturalWidth
+          mask.height = img.naturalHeight
+          mask.getContext('2d')?.clearRect(0, 0, mask.width, mask.height)
+        }
       }
       img.src = dataUrl
     })
     return () => {
       alive = false
     }
-  }, [mosaic, cur])
+  }, [mosaic, inpaint, cur])
 
   // Load the current character / situation prompts when the editor opens.
   useEffect(() => {
@@ -207,6 +221,85 @@ export default function GenerationViewer({
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (canvas && ctx) applyFineMosaic(ctx, canvas, x, y, w, h)
+  }
+
+  // ---- inpaint mask brush ----
+  function maskXY(e: React.PointerEvent): { x: number; y: number } {
+    const m = maskRef.current!
+    const rect = m.getBoundingClientRect()
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * m.width,
+      y: ((e.clientY - rect.top) / rect.height) * m.height
+    }
+  }
+  function paintStroke(from: { x: number; y: number } | null, to: { x: number; y: number }): void {
+    const ctx = maskRef.current?.getContext('2d')
+    if (!ctx) return
+    ctx.fillStyle = '#ffffff'
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineCap = 'round'
+    ctx.lineWidth = brush
+    ctx.beginPath()
+    ctx.arc(to.x, to.y, brush / 2, 0, Math.PI * 2)
+    ctx.fill()
+    if (from) {
+      ctx.beginPath()
+      ctx.moveTo(from.x, from.y)
+      ctx.lineTo(to.x, to.y)
+      ctx.stroke()
+    }
+  }
+  function maskDown(e: React.PointerEvent): void {
+    const p = maskXY(e)
+    paintRef.current = p
+    paintStroke(null, p)
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  }
+  function maskMove(e: React.PointerEvent): void {
+    if (!paintRef.current) return
+    const p = maskXY(e)
+    paintStroke(paintRef.current, p)
+    paintRef.current = p
+  }
+  function maskUp(): void {
+    paintRef.current = null
+  }
+  function clearMask(): void {
+    const m = maskRef.current
+    m?.getContext('2d')?.clearRect(0, 0, m.width, m.height)
+  }
+
+  async function runInpaint(): Promise<void> {
+    const mask = maskRef.current
+    if (!mask) return
+    // require some painted area
+    const data = mask.getContext('2d')?.getImageData(0, 0, mask.width, mask.height).data
+    if (!data || !data.some((_, i) => i % 4 === 3 && data[i] > 0)) {
+      toast.error('再描画する範囲を塗ってください')
+      return
+    }
+    setBusy(true)
+    try {
+      // composite the white strokes onto a black background = the NAI mask
+      const out = document.createElement('canvas')
+      out.width = mask.width
+      out.height = mask.height
+      const octx = out.getContext('2d')
+      if (!octx) throw new Error('canvas が使えません')
+      octx.fillStyle = '#000000'
+      octx.fillRect(0, 0, out.width, out.height)
+      octx.drawImage(mask, 0, 0)
+      const prev = await api.generations.imageData(cur.id)
+      await api.generations.inpaint(cur.id, out.toDataURL('image/png'), inpaintPrompt.trim())
+      onChanged()
+      setUndoData(prev)
+      setInpaint(false)
+      toast.success('部分再描画しました')
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function regenerate(): Promise<void> {
@@ -316,7 +409,7 @@ export default function GenerationViewer({
 
       {/* image / canvas */}
       <div className="relative flex min-h-0 flex-1 items-center justify-center px-12">
-        {!mosaic && (
+        {!mosaic && !inpaint && (
           <button
             onClick={() => go(-1)}
             className="absolute left-2 rounded-full bg-white/10 p-2 text-ink-200 hover:bg-white/20"
@@ -331,10 +424,21 @@ export default function GenerationViewer({
             onPointerUp={onPointerUp}
             className="max-h-full max-w-full cursor-crosshair touch-none rounded"
           />
+        ) : inpaint ? (
+          <div className="relative flex max-h-full max-w-full">
+            <canvas ref={canvasRef} className="max-h-full max-w-full rounded" />
+            <canvas
+              ref={maskRef}
+              onPointerDown={maskDown}
+              onPointerMove={maskMove}
+              onPointerUp={maskUp}
+              className="absolute inset-0 h-full w-full cursor-crosshair touch-none rounded opacity-50"
+            />
+          </div>
         ) : (
           <img src={cur.image_url ?? ''} className="max-h-full max-w-full rounded object-contain" />
         )}
-        {!mosaic && (
+        {!mosaic && !inpaint && (
           <button
             onClick={() => go(1)}
             className="absolute right-2 rounded-full bg-white/10 p-2 text-ink-200 hover:bg-white/20"
@@ -344,8 +448,8 @@ export default function GenerationViewer({
         )}
       </div>
 
-      {/* per-image dialogue (local LLM) */}
-      {!mosaic && (
+      {/* per-image dialogue */}
+      {!mosaic && !inpaint && (
         <div className="flex items-center gap-2 border-t border-ink-700 bg-ink-900/80 px-6 py-2">
           <span className="shrink-0 text-xs text-ink-500">セリフ</span>
           <input
@@ -442,6 +546,45 @@ export default function GenerationViewer({
               キャンセル
             </button>
           </>
+        ) : inpaint ? (
+          <div className="flex w-full max-w-4xl items-center gap-2">
+            <input
+              value={inpaintPrompt}
+              onChange={(e) => setInpaintPrompt(e.target.value)}
+              placeholder="塗った範囲に描く内容（任意・英語タグ。例: open mouth）"
+              className="flex-1 rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
+            />
+            <label className="flex shrink-0 items-center gap-1 text-xs text-ink-500">
+              太さ
+              <input
+                type="range"
+                min={8}
+                max={160}
+                value={brush}
+                onChange={(e) => setBrush(Number(e.target.value))}
+              />
+            </label>
+            <button
+              onClick={runInpaint}
+              disabled={busy}
+              className="flex shrink-0 items-center gap-1.5 rounded-md bg-accent/20 px-4 py-1.5 text-sm text-accent ring-1 ring-accent/50 hover:bg-accent/30 disabled:opacity-50"
+            >
+              {busy ? <Loader2 size={14} className="animate-spin" /> : null} 再描画
+            </button>
+            <button
+              onClick={clearMask}
+              disabled={busy}
+              className="shrink-0 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-300 hover:bg-white/10"
+            >
+              クリア
+            </button>
+            <button
+              onClick={() => setInpaint(false)}
+              className="shrink-0 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-300 hover:bg-white/10"
+            >
+              キャンセル
+            </button>
+          </div>
         ) : (
           <>
             <button
@@ -484,6 +627,17 @@ export default function GenerationViewer({
               className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:bg-white/10"
             >
               <SquareDashedMousePointer size={15} /> モザイク
+            </button>
+            <button
+              onClick={() => {
+                setPlaying(false)
+                setEditOpen(false)
+                setInpaintPrompt('')
+                setInpaint(true)
+              }}
+              className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:bg-white/10"
+            >
+              <Paintbrush size={15} /> 部分再描画
             </button>
           </>
         )}
