@@ -123,54 +123,81 @@ export default function Gallery(): JSX.Element {
           まだ生成バッチがありません。「一括生成」から作成してください。
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {(batches ?? []).map((b) => {
             const success = successOf(b)
             const open = expanded.has(b.id)
             const cover = success.find((g) => g.thumbnail_url)?.thumbnail_url ?? null
+            const statusBadge = (
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] ${
+                  b.status === 'completed'
+                    ? 'bg-emerald-500/15 text-emerald-300'
+                    : b.status === 'failed'
+                      ? 'bg-red-500/15 text-red-300'
+                      : b.status === 'processing' || b.status === 'pending'
+                        ? 'bg-accent/15 text-accent'
+                        : 'bg-ink-700 text-ink-200'
+                }`}
+              >
+                {STATUS_LABEL[b.status]} {b.done_count}/{b.total}
+              </span>
+            )
+            const meta =
+              (b.type === 'scene'
+                ? `[${b.character_tag_name || '?'}] × ${b.story_name || '?'}`
+                : `${b.character_name || '?'} × ${b.story_name || '?'}`) +
+              (success.length > 0 ? ` ・ ${success.length}枚` : '')
             return (
               <section
                 key={b.id}
                 className={`overflow-hidden rounded-xl border border-ink-700 bg-ink-800/40 ${
-                  open ? 'sm:col-span-3' : ''
+                  open ? 'sm:col-span-3 lg:col-span-4' : ''
                 }`}
               >
-                {/* collapsed card header — click to expand */}
+                {/* header — collapsed: square card with the first image as a faded
+                    background + overlaid text; expanded: a compact bar */}
                 <button
                   onClick={() => toggleExpand(b.id)}
-                  className="flex w-full items-center gap-3 p-3 text-left hover:bg-ink-800/60"
+                  className={`relative w-full overflow-hidden text-left ${
+                    open ? 'flex items-center gap-3 p-3 hover:bg-ink-800/60' : 'block aspect-square'
+                  }`}
                 >
-                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-ink-800">
-                    {cover && <img src={cover} alt="" className="h-full w-full object-cover" />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h2 className="truncate text-sm font-semibold text-ink-100">{b.name}</h2>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] ${
-                          b.status === 'completed'
-                            ? 'bg-emerald-500/15 text-emerald-300'
-                            : b.status === 'failed'
-                              ? 'bg-red-500/15 text-red-300'
-                              : b.status === 'processing' || b.status === 'pending'
-                                ? 'bg-accent/15 text-accent'
-                                : 'bg-ink-700 text-ink-400'
-                        }`}
-                      >
-                        {STATUS_LABEL[b.status]} {b.done_count}/{b.total}
-                      </span>
-                    </div>
-                    <span className="text-xs text-ink-500">
-                      {b.type === 'scene'
-                        ? `[${b.character_tag_name || '?'}] × ${b.story_name || '?'}`
-                        : `${b.character_name || '?'} × ${b.story_name || '?'}`}
-                      {success.length > 0 && ` ・ ${success.length}枚`}
-                    </span>
-                  </div>
-                  <ChevronDown
-                    size={18}
-                    className={`shrink-0 text-ink-500 transition-transform ${open ? 'rotate-180' : ''}`}
-                  />
+                  {open ? (
+                    <>
+                      <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-ink-800">
+                        {cover && <img src={cover} alt="" className="h-full w-full object-cover" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h2 className="truncate text-sm font-semibold text-ink-100">{b.name}</h2>
+                          {statusBadge}
+                        </div>
+                        <span className="text-xs text-ink-500">{meta}</span>
+                      </div>
+                      <ChevronDown size={18} className="shrink-0 rotate-180 text-ink-500" />
+                    </>
+                  ) : (
+                    <>
+                      {cover && (
+                        <img
+                          src={cover}
+                          alt=""
+                          className="absolute inset-0 h-full w-full object-cover opacity-25"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-ink-900/95 via-ink-900/30 to-ink-900/50" />
+                      <div className="absolute inset-0 flex flex-col justify-between p-3">
+                        <div className="flex justify-end">{statusBadge}</div>
+                        <div>
+                          <div className="truncate text-sm font-semibold text-white drop-shadow">
+                            {b.name}
+                          </div>
+                          <div className="truncate text-[11px] text-ink-200 drop-shadow">{meta}</div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </button>
 
                 {/* smooth expand (grid-rows 0fr→1fr) */}
