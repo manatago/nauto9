@@ -435,18 +435,19 @@ export default function GenerationViewer({
             className="max-h-full max-w-full cursor-crosshair touch-none rounded"
           />
         ) : inpaint ? (
-          // wrapper fills the area (definite size) so the canvases' max-h/max-w
-          // resolve; both share one grid cell to overlap at the same scaled size.
-          <div className="grid h-full w-full place-items-center overflow-hidden">
-            <canvas ref={canvasRef} className="col-start-1 row-start-1 max-h-full max-w-full rounded" />
+          // image canvas scales like the mosaic one (direct child, max-h/max-w);
+          // the mask canvas overlays it via absolute + margin:auto centering at the
+          // same max-constrained size. No clipping, so the whole image is reachable.
+          <>
+            <canvas ref={canvasRef} className="max-h-full max-w-full rounded" />
             <canvas
               ref={maskRef}
               onPointerDown={maskDown}
               onPointerMove={maskMove}
               onPointerUp={maskUp}
-              className="col-start-1 row-start-1 max-h-full max-w-full cursor-crosshair touch-none rounded opacity-50"
+              className="absolute inset-0 m-auto max-h-full max-w-full cursor-crosshair touch-none rounded opacity-50"
             />
-          </div>
+          </>
         ) : (
           <img src={cur.image_url ?? ''} className="max-h-full max-w-full rounded object-contain" />
         )}
