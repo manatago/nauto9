@@ -435,9 +435,9 @@ export default function GenerationViewer({
             className="max-h-full max-w-full cursor-crosshair touch-none rounded"
           />
         ) : inpaint ? (
-          // both canvases share one grid cell so they overlap at the SAME scaled
-          // size (each keeps the image aspect ratio via max-h/max-w).
-          <div className="grid max-h-full max-w-full place-items-center">
+          // wrapper fills the area (definite size) so the canvases' max-h/max-w
+          // resolve; both share one grid cell to overlap at the same scaled size.
+          <div className="grid h-full w-full place-items-center overflow-hidden">
             <canvas ref={canvasRef} className="col-start-1 row-start-1 max-h-full max-w-full rounded" />
             <canvas
               ref={maskRef}
