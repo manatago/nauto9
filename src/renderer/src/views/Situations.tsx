@@ -96,6 +96,19 @@ export default function Situations(): JSX.Element {
     }
   }
 
+  // Card-shaped "add" button placed after the last situation card (nauto8 style),
+  // so adding doesn't require scrolling back to the top. Only when a story is open.
+  const addCard =
+    storyId !== null ? (
+      <button
+        onClick={() => setModal({ open: true, situation: null })}
+        className="flex aspect-[3/4] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-ink-600 text-ink-400 transition hover:border-accent/60 hover:bg-ink-800/40 hover:text-accent"
+      >
+        <Plus size={24} />
+        <span className="text-xs">シチュ追加</span>
+      </button>
+    ) : null
+
   return (
     <div className="mx-auto flex h-full max-w-6xl gap-5 px-6 py-5">
       <StorySidebar
@@ -118,14 +131,6 @@ export default function Situations(): JSX.Element {
             {storyId === null ? 'すべてのシチュエーション' : storyMap.get(storyId)}
           </h1>
           <span className="text-sm text-ink-500">{filtered.length}</span>
-          {storyId !== null && (
-            <button
-              onClick={() => setModal({ open: true, situation: null })}
-              className="ml-auto flex items-center gap-1.5 rounded-md bg-accent/20 px-3 py-1.5 text-sm text-accent ring-1 ring-accent/50 hover:bg-accent/30"
-            >
-              <Plus size={15} /> シチュ追加
-            </button>
-          )}
         </div>
 
         {storyId !== null && (
@@ -179,13 +184,9 @@ export default function Situations(): JSX.Element {
           </p>
         )}
 
-        {filtered.length === 0 ? (
+        {storyId === null && filtered.length === 0 ? (
           <div className="rounded-lg border border-dashed border-ink-600 py-16 text-center text-ink-500">
-            {storyId === null
-              ? 'シチュエーションがありません'
-              : stories?.length
-                ? '「シチュ追加」で作成してください'
-                : '左の＋でストーリーを作成してください'}
+            {stories?.length ? 'シチュエーションがありません' : '左の＋でストーリーを作成してください'}
           </div>
         ) : reorderable ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -201,6 +202,7 @@ export default function Situations(): JSX.Element {
                     onPreview={() => runPreview(s)}
                   />
                 ))}
+                {addCard}
               </div>
             </SortableContext>
           </DndContext>
@@ -217,6 +219,7 @@ export default function Situations(): JSX.Element {
                 onPreview={() => runPreview(s)}
               />
             ))}
+            {addCard}
           </div>
         )}
       </section>
