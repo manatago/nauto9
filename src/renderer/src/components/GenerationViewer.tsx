@@ -289,6 +289,16 @@ export default function GenerationViewer({
       octx.fillStyle = '#000000'
       octx.fillRect(0, 0, out.width, out.height)
       octx.drawImage(mask, 0, 0)
+      // Binarize: the brush is anti-aliased, so edges composite to gray — which
+      // NAI treats as partial inpaint and leaves a gray seam. Force pure B/W.
+      const id = octx.getImageData(0, 0, out.width, out.height)
+      const px = id.data
+      for (let i = 0; i < px.length; i += 4) {
+        const v = px[i] > 64 ? 255 : 0
+        px[i] = px[i + 1] = px[i + 2] = v
+        px[i + 3] = 255
+      }
+      octx.putImageData(id, 0, 0)
       const prev = await api.generations.imageData(cur.id)
       await api.generations.inpaint(cur.id, out.toDataURL('image/png'), inpaintPrompt.trim())
       onChanged()
@@ -425,14 +435,16 @@ export default function GenerationViewer({
             className="max-h-full max-w-full cursor-crosshair touch-none rounded"
           />
         ) : inpaint ? (
-          <div className="relative flex max-h-full max-w-full">
-            <canvas ref={canvasRef} className="max-h-full max-w-full rounded" />
+          // both canvases share one grid cell so they overlap at the SAME scaled
+          // size (each keeps the image aspect ratio via max-h/max-w).
+          <div className="grid max-h-full max-w-full place-items-center">
+            <canvas ref={canvasRef} className="col-start-1 row-start-1 max-h-full max-w-full rounded" />
             <canvas
               ref={maskRef}
               onPointerDown={maskDown}
               onPointerMove={maskMove}
               onPointerUp={maskUp}
-              className="absolute inset-0 h-full w-full cursor-crosshair touch-none rounded opacity-50"
+              className="col-start-1 row-start-1 max-h-full max-w-full cursor-crosshair touch-none rounded opacity-50"
             />
           </div>
         ) : (
