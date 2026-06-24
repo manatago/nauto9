@@ -143,7 +143,7 @@ export default function CharacterDetail({ characterId, onBack, onSelect }: Props
         {onSelect && (
           <div className="ml-auto flex items-center gap-1">
             {idx >= 0 && list && (
-              <span className="mr-1 text-xs text-ink-600">
+              <span className="mr-1 text-xs text-ink-500">
                 {idx + 1} / {list.length}
               </span>
             )}

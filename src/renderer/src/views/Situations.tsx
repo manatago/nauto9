@@ -174,13 +174,13 @@ export default function Situations(): JSX.Element {
         )}
 
         {!reorderable && storyId !== null && filterTags.length > 0 && (
-          <p className="mb-2 flex items-center gap-1 text-[11px] text-ink-600">
+          <p className="mb-2 flex items-center gap-1 text-[11px] text-ink-500">
             <Check size={12} /> タグ絞り込み中は並び替えできません（解除すると可能）
           </p>
         )}
 
         {filtered.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-ink-600 py-16 text-center text-ink-600">
+          <div className="rounded-lg border border-dashed border-ink-600 py-16 text-center text-ink-500">
             {storyId === null
               ? 'シチュエーションがありません'
               : stories?.length

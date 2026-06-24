@@ -137,7 +137,7 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
                   </button>
                 </div>
                 {(situations ?? []).length === 0 ? (
-                  <div className="rounded-md border border-ink-700 bg-ink-900/40 px-2 py-3 text-xs text-ink-600">
+                  <div className="rounded-md border border-ink-700 bg-ink-900/40 px-2 py-3 text-xs text-ink-500">
                     シチュエーションがありません
                   </div>
                 ) : (
@@ -162,7 +162,7 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
                               className={`absolute inset-0 h-full w-full object-cover ${on ? '' : 'opacity-90 group-hover:opacity-100'}`}
                             />
                           ) : (
-                            <div className="absolute inset-0 flex items-center justify-center p-2 text-center text-[10px] leading-snug text-ink-600">
+                            <div className="absolute inset-0 flex items-center justify-center p-2 text-center text-[10px] leading-snug text-ink-500">
                               {s.prompt || s.name || '（未設定）'}
                             </div>
                           )}

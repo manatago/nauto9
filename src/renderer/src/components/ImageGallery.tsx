@@ -99,7 +99,7 @@ function Card(props: {
         onChange={(e) => setCaption(e.target.value)}
         onBlur={() => caption !== (image.caption ?? '') && props.onUpdateCaption(caption)}
         placeholder="caption"
-        className="w-full rounded-b-lg border-t border-ink-700 bg-transparent px-2 py-1 text-[11px] text-ink-300 outline-none placeholder:text-ink-600"
+        className="w-full rounded-b-lg border-t border-ink-700 bg-transparent px-2 py-1 text-[11px] text-ink-300 outline-none placeholder:text-ink-500"
       />
     </div>
   )
@@ -192,7 +192,7 @@ export default function ImageGallery(props: Props): JSX.Element {
         {props.images.length === 0 ? (
           <div
             className={`rounded-lg border border-dashed py-12 text-center text-sm ${
-              fileDragOver ? 'border-accent/70 text-accent' : 'border-ink-600 text-ink-600'
+              fileDragOver ? 'border-accent/70 text-accent' : 'border-ink-600 text-ink-500'
             }`}
           >
             画像をここにドラッグ&ドロップ、または「画像を追加」

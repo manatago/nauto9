@@ -201,7 +201,7 @@ export default function ArticlePreview({
     if (b.kind === 'customHtml')
       return (
         <div key={b.id} className="flex items-start gap-2">
-          <span className="mt-1.5 w-10 shrink-0 text-[10px] uppercase text-ink-600">広告</span>
+          <span className="mt-1.5 w-10 shrink-0 text-[10px] uppercase text-ink-500">広告</span>
           <textarea
             value={b.text}
             onChange={(e) => setBlock(b.id, e.target.value)}
@@ -232,7 +232,7 @@ export default function ArticlePreview({
           : 'text-sm text-ink-300'
     return (
       <div key={b.id} className="flex items-start gap-2">
-        <span className="mt-1.5 w-10 shrink-0 text-[10px] uppercase text-ink-600">
+        <span className="mt-1.5 w-10 shrink-0 text-[10px] uppercase text-ink-500">
           {b.kind === 'h2' ? 'h2' : b.kind === 'dialogue' ? (dialogueIsH3 ? 'h3' : 'セリフ') : '説明'}
         </span>
         <textarea
@@ -273,7 +273,7 @@ export default function ArticlePreview({
             ))}
           </div>
           <div className="flex items-start gap-2">
-            <span className="mt-2 w-10 shrink-0 text-[10px] uppercase text-ink-600">題</span>
+            <span className="mt-2 w-10 shrink-0 text-[10px] uppercase text-ink-500">題</span>
             <input
               value={article.title}
               onChange={(e) => setTitle(e.target.value)}
@@ -282,7 +282,7 @@ export default function ArticlePreview({
             <RegenBtn k="title" fn={() => api.articles.regenerate({ batch_id: article.batch_id ?? 0, target: 'title' })} />
           </div>
           <div className="flex items-start gap-2">
-            <span className="mt-1.5 w-10 shrink-0 text-[10px] uppercase text-ink-600">導入</span>
+            <span className="mt-1.5 w-10 shrink-0 text-[10px] uppercase text-ink-500">導入</span>
             <textarea
               value={article.intro}
               onChange={(e) => setIntro(e.target.value)}
@@ -294,7 +294,7 @@ export default function ArticlePreview({
           <hr className="border-ink-700" />
           {article.blocks.map(renderBlock)}
           <div className="flex items-center justify-end gap-3 border-t border-ink-700 pt-3">
-            <span className="mr-auto text-[11px] text-ink-600">
+            <span className="mr-auto text-[11px] text-ink-500">
               画像はwebpに変換して下書きとして投稿します
             </span>
             <button

@@ -11,7 +11,7 @@ interface Props {
 export default function StoryCardGrid({ stories, value, onChange }: Props): JSX.Element {
   if (stories.length === 0)
     return (
-      <div className="rounded-md border border-ink-700 bg-ink-900/40 px-2 py-3 text-center text-xs text-ink-600">
+      <div className="rounded-md border border-ink-700 bg-ink-900/40 px-2 py-3 text-center text-xs text-ink-500">
         ストーリーがありません
       </div>
     )
@@ -30,7 +30,7 @@ export default function StoryCardGrid({ stories, value, onChange }: Props): JSX.
             {s.thumbnail_url ? (
               <img src={s.thumbnail_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-ink-800 text-ink-600">
+              <div className="absolute inset-0 flex items-center justify-center bg-ink-800 text-ink-500">
                 <Layers size={20} />
               </div>
             )}

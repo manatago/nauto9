@@ -402,7 +402,7 @@ export default function GenerationViewer({
             </div>
           )}
           <div className="mt-2 flex items-center gap-2">
-            <span className="mr-auto text-[11px] text-ink-600">
+            <span className="mr-auto text-[11px] text-ink-500">
               元のキャラ／シチュのプロンプトを更新します（他の生成にも反映されます）
             </span>
             <button

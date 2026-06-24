@@ -29,7 +29,7 @@ export default function Articles(): JSX.Element {
       {!items ? (
         <p className="text-sm text-ink-500">読み込み中…</p>
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-ink-600 py-16 text-center text-ink-600">
+        <div className="rounded-lg border border-dashed border-ink-600 py-16 text-center text-ink-500">
           保存した記事はまだありません（ギャラリーの「記事作成」→「保存」で作れます）
         </div>
       ) : (
@@ -45,7 +45,7 @@ export default function Articles(): JSX.Element {
                 className="min-w-0 flex-1 text-left"
               >
                 <div className="truncate text-sm text-ink-100">{it.title || '無題'}</div>
-                <div className="text-[11px] text-ink-600">{it.updated_at}</div>
+                <div className="text-[11px] text-ink-500">{it.updated_at}</div>
               </button>
               <button
                 onClick={() => setEditing(it.id)}

@@ -65,7 +65,7 @@ export default function StorySidebar({
                 {s.thumbnail_url ? (
                   <img src={s.thumbnail_url} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-ink-600">
+                  <div className="flex h-full items-center justify-center text-ink-500">
                     <Layers size={20} />
                   </div>
                 )}

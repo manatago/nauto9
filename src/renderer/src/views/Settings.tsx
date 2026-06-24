@@ -114,7 +114,7 @@ function ReferenceSettings(): JSX.Element {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-ink-600">
+      <p className="text-xs text-ink-500">
         「参照ON」にした画像をプレビュー生成へ送ります。Vibe Transfer か精密参照を選べます。
       </p>
       <label className="block max-w-xs">
@@ -202,7 +202,7 @@ function LlmSettings(): JSX.Element {
 
       {provider === 'grok' && (
         <div className="space-y-3 rounded-md border border-ink-700 bg-ink-900/40 p-3">
-          <p className="text-xs text-ink-600">
+          <p className="text-xs text-ink-500">
             xAI の Grok API でセリフを生成します。送信内容は xAI に送られます。露骨な表現は規約上拒否されることがあります。
           </p>
           <div className="grid grid-cols-2 gap-3 sm:max-w-lg">
@@ -229,7 +229,7 @@ function LlmSettings(): JSX.Element {
         </div>
       )}
 
-      <p className="text-xs text-ink-600">
+      <p className="text-xs text-ink-500">
         ローカル（Ollama）の設定 — `ollama serve` を起動し、使うモデルを pull しておいてください。
       </p>
       <div className="grid grid-cols-2 gap-3 sm:max-w-lg">
@@ -298,7 +298,7 @@ function WpSettings(): JSX.Element {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-ink-600">
+      <p className="text-xs text-ink-500">
         記事を下書きとして投稿します。認証はアプリケーションパスワード（ユーザー → プロフィール → アプリケーションパスワード）。
       </p>
       <label className="block sm:max-w-lg">
@@ -346,7 +346,7 @@ function PreviewSettings(): JSX.Element {
   if (!loaded) return <></>
   return (
     <div className="space-y-2">
-      <p className="text-xs text-ink-600">
+      <p className="text-xs text-ink-500">
         キャラ詳細の「プレビュー生成」時に、シーンとして追加するプロンプト（品質タグや既定のポーズなど）。
       </p>
       <textarea
@@ -388,7 +388,7 @@ function AdSettings(): JSX.Element {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-ink-600">
+      <p className="text-xs text-ink-500">
         HTML形式で複数登録できます。記事生成時、各章見出し（2番目以降）の直前にこの中からランダムで1つ挿入されます。
       </p>
       <div className="space-y-2 sm:max-w-xl">
@@ -462,7 +462,7 @@ export default function Settings(): JSX.Element {
       <h1 className="mb-2 text-xl font-semibold">設定</h1>
 
       <SettingsCard title="NovelAI トークン" defaultOpen>
-        <p className="mb-2 text-xs text-ink-600">プレビュー生成に必要です。ローカルの DB に保存されます。</p>
+        <p className="mb-2 text-xs text-ink-500">プレビュー生成に必要です。ローカルの DB に保存されます。</p>
         <div className="flex gap-2">
           <input
             type="password"

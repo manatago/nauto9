@@ -28,7 +28,7 @@ export default function CharacterCardGrid({ characters, tags, value, onChange }:
   return (
     <div className="space-y-2">
       <div className="relative">
-        <Search size={15} className="pointer-events-none absolute left-2.5 top-2.5 text-ink-600" />
+        <Search size={15} className="pointer-events-none absolute left-2.5 top-2.5 text-ink-500" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -67,7 +67,7 @@ export default function CharacterCardGrid({ characters, tags, value, onChange }:
       )}
 
       {filtered.length === 0 ? (
-        <div className="rounded-md border border-ink-700 bg-ink-900/40 px-2 py-3 text-center text-xs text-ink-600">
+        <div className="rounded-md border border-ink-700 bg-ink-900/40 px-2 py-3 text-center text-xs text-ink-500">
           該当するキャラがいません
         </div>
       ) : (

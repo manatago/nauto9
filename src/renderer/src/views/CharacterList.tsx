@@ -73,7 +73,7 @@ export default function CharacterList({ onOpen }: Props): JSX.Element {
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative">
-          <Search size={15} className="absolute left-2.5 top-2.5 text-ink-600" />
+          <Search size={15} className="absolute left-2.5 top-2.5 text-ink-500" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -131,7 +131,7 @@ export default function CharacterList({ onOpen }: Props): JSX.Element {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-ink-600 py-20 text-center text-ink-600">
+        <div className="rounded-lg border border-dashed border-ink-600 py-20 text-center text-ink-500">
           キャラクターがいません。「新規キャラ」から作成してください。
         </div>
       ) : (
@@ -192,7 +192,7 @@ export default function CharacterList({ onOpen }: Props): JSX.Element {
               className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60"
             />
           </label>
-          <p className="text-xs text-ink-600">
+          <p className="text-xs text-ink-500">
             作成後、詳細画面で参照画像（vibe）を登録できます。衣装違いは別キャラとして作るのがおすすめです。
           </p>
           <div className="flex justify-end gap-2">

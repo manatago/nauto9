@@ -88,7 +88,7 @@ export default function SituationModal({
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <label className="block lg:col-span-2">
           <span className="mb-1 block text-xs text-ink-500">
-            名前 <span className="text-ink-600">（`xxx` は生成時にキャラ名へ置換）</span>
+            名前 <span className="text-ink-500">（`xxx` は生成時にキャラ名へ置換）</span>
           </span>
           <input
             autoFocus
@@ -150,7 +150,7 @@ export default function SituationModal({
         <label className="block lg:col-span-2">
           <span className="mb-1 block text-xs text-ink-500">
             状況メモ / セリフ例（任意・1行に1つ）
-            <span className="text-ink-600">
+            <span className="text-ink-500">
               　セリフ生成の文脈。状況や流れを書くのがおすすめ（Grok向き）。言いそうなセリフ例でも可（ローカル向き）。`xxx`はキャラ名へ置換
             </span>
           </span>

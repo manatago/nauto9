@@ -51,7 +51,7 @@ export default function ReplacementsEditor({
           <Plus size={13} /> ルール追加
         </button>
       </div>
-      <p className="mt-1 text-[11px] text-ink-600">
+      <p className="mt-1 text-[11px] text-ink-500">
         部分一致・大文字小文字無視・上から順に適用（nauto8 と同じ）。
       </p>
     </div>

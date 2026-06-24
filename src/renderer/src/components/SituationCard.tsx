@@ -22,7 +22,7 @@ export function SituationCard(props: SituationCardProps): JSX.Element {
       {s.preview_image_url ? (
         <img src={s.preview_image_url} className="absolute inset-0 h-full w-full object-cover" />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center p-3 text-center text-[11px] leading-snug text-ink-600">
+        <div className="absolute inset-0 flex items-center justify-center p-3 text-center text-[11px] leading-snug text-ink-500">
           {s.prompt || '（プロンプト未設定）'}
         </div>
       )}

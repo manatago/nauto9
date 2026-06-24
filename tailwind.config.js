@@ -5,11 +5,16 @@ export default {
     extend: {
       colors: {
         ink: {
-          900: '#0b0e14',
-          800: '#11151f',
+          50: '#f5f7fb',
+          100: '#e6eaf2',
+          200: '#d0d7e3',
+          300: '#b9c1d1',
+          400: '#9aa3b8', // secondary text — clearly readable on dark
+          500: '#80899e', // dim/hint text — was #36405c (nearly invisible)
+          600: '#252d42', // borders / dividers (kept dark on purpose)
           700: '#1a2030',
-          600: '#252d42',
-          500: '#36405c'
+          800: '#11151f',
+          900: '#0b0e14'
         },
         accent: {
           DEFAULT: '#5eead4',

@@ -27,7 +27,7 @@ function GenCell({
 }): JSX.Element {
   if (g.status === 'pending')
     return (
-      <div className="flex aspect-[2/3] items-center justify-center rounded-md border border-ink-700 bg-ink-900 text-ink-600">
+      <div className="flex aspect-[2/3] items-center justify-center rounded-md border border-ink-700 bg-ink-900 text-ink-500">
         <Loader2 size={18} className="animate-spin" />
       </div>
     )
@@ -119,7 +119,7 @@ export default function Gallery(): JSX.Element {
       <h1 className="mb-4 text-xl font-semibold">ギャラリー</h1>
 
       {(batches ?? []).length === 0 ? (
-        <div className="rounded-lg border border-dashed border-ink-600 py-20 text-center text-ink-600">
+        <div className="rounded-lg border border-dashed border-ink-600 py-20 text-center text-ink-500">
           まだ生成バッチがありません。「一括生成」から作成してください。
         </div>
       ) : (
