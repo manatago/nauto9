@@ -123,13 +123,18 @@ export default function Gallery(): JSX.Element {
           まだ生成バッチがありません。「一括生成」から作成してください。
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {(batches ?? []).map((b) => {
             const success = successOf(b)
             const open = expanded.has(b.id)
             const cover = success.find((g) => g.thumbnail_url)?.thumbnail_url ?? null
             return (
-              <section key={b.id} className="overflow-hidden rounded-xl border border-ink-700 bg-ink-800/40">
+              <section
+                key={b.id}
+                className={`overflow-hidden rounded-xl border border-ink-700 bg-ink-800/40 ${
+                  open ? 'sm:col-span-3' : ''
+                }`}
+              >
                 {/* collapsed card header — click to expand */}
                 <button
                   onClick={() => toggleExpand(b.id)}

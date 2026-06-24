@@ -17,7 +17,11 @@ function SettingsCard({
 }): JSX.Element {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="overflow-hidden rounded-xl border border-ink-700 bg-ink-800/40">
+    <div
+      className={`overflow-hidden rounded-xl border border-ink-700 bg-ink-800/40 ${
+        open ? 'sm:col-span-3' : ''
+      }`}
+    >
       <button
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-ink-800/60"
@@ -458,9 +462,10 @@ export default function Settings(): JSX.Element {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-3 px-6 py-6">
-      <h1 className="mb-2 text-xl font-semibold">設定</h1>
+    <div className="mx-auto max-w-5xl px-6 py-6">
+      <h1 className="mb-3 text-xl font-semibold">設定</h1>
 
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <SettingsCard title="NovelAI トークン" defaultOpen>
         <p className="mb-2 text-xs text-ink-500">プレビュー生成に必要です。ローカルの DB に保存されます。</p>
         <div className="flex gap-2">
@@ -511,6 +516,7 @@ export default function Settings(): JSX.Element {
       <SettingsCard title="広告リンク（2番目以降の h2 直前に挿入）">
         <AdSettings />
       </SettingsCard>
+      </div>
     </div>
   )
 }
