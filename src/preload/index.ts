@@ -83,6 +83,9 @@ const api: Api = {
   novelai: {
     anlas: () => invoke('novelai:anlas') as Promise<never>
   },
+  grok: {
+    test: () => invoke('grok:test') as Promise<never>
+  },
   settings: {
     get: (key) => invoke('settings:get', key) as Promise<never>,
     set: (key, value) => invoke('settings:set', key, value) as Promise<never>

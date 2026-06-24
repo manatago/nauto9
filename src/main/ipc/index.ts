@@ -19,6 +19,7 @@ import { composeArticle, regenerateArticleBlock } from '../services/article'
 import { postArticleToWordpress } from '../services/article-post'
 import * as articleRepo from '../db/articles'
 import { testConnection, wpConfigFrom } from '../services/wordpress'
+import { testApiKey } from '../services/xai'
 import { generateImage, getAnlas } from '../services/novelai'
 import { buildReferenceParams, referenceMode } from '../services/reference'
 import { decodeDataUrl, mediaUrl, saveImage, saveImageWithName, thumbKey } from '../services/images'
@@ -208,6 +209,7 @@ export function registerIpc(): void {
   handle('articles:get', (id: number) => articleRepo.getArticle(id))
   handle('articles:delete', (id: number) => articleRepo.deleteArticle(id))
   handle('novelai:anlas', () => getAnlas(repo.getSetting('NOVELAI_API_TOKEN') ?? ''))
+  handle('grok:test', () => testApiKey())
   handle('wordpress:test', () =>
     testConnection(
       wpConfigFrom(

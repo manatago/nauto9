@@ -1,6 +1,6 @@
 // Pure helpers for the Grok dialogue path (no IO) — output cleanup and scene
 // classification. Separated so they're unit-testable.
-import type { DialogueContext } from './ollama'
+import type { DialogueContext } from './dialogue-types'
 
 export function cleanGrokLine(s: string): string {
   const out = s.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()

@@ -1,33 +1,11 @@
 import * as repo from '../db/repo'
 import * as sit from '../db/situations'
 import * as batches from '../db/batches'
-import {
-  DEFAULT_DIALOGUE_TEMPLATE,
-  generateDialogue,
-  type DialogueContext,
-  type OllamaOptions
-} from './ollama'
 import { generateDialogueGrok } from './grok'
 import { replaceXxx } from './prompt'
 
-function ollamaOptions(): OllamaOptions {
-  return {
-    url: repo.getSetting('OLLAMA_URL') || 'http://localhost:11434',
-    model: repo.getSetting('OLLAMA_MODEL') || '',
-    template: repo.getSetting('DIALOGUE_PROMPT_TEMPLATE') || DEFAULT_DIALOGUE_TEMPLATE
-  }
-}
-
-// Dispatch to the configured provider: local Ollama (default) or remote Grok.
-function generateLine(ctx: DialogueContext): Promise<string> {
-  if ((repo.getSetting('LLM_PROVIDER') || 'local').trim() === 'grok') {
-    return generateDialogueGrok(ctx)
-  }
-  return generateDialogue(ctx, ollamaOptions())
-}
-
 // Gather context for one generation (character + story + situation) and ask the
-// local LLM for a line; persist it on the generation.
+// LLM (Grok) for a line; persist it on the generation.
 export async function generateDialogueForGeneration(genId: number): Promise<void> {
   const g = batches.getGenerationRow(genId)
   if (!g) throw new Error('生成が見つかりません')
@@ -53,7 +31,7 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
   // Lines already used on other images in this batch — avoid repeating them.
   const avoid = batches.dialoguesInBatch(g.batch_id, genId)
 
-  const line = await generateLine({
+  const line = await generateDialogueGrok({
     character: char.name,
     traits,
     story: story?.name ?? '',

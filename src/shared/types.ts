@@ -371,6 +371,9 @@ export interface Api {
   novelai: {
     anlas(): Promise<number> // remaining Anlas for the account
   }
+  grok: {
+    test(): Promise<{ name: string }> // validate the API key
+  }
   settings: {
     get(key: string): Promise<string | null>
     set(key: string, value: string): Promise<void>

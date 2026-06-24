@@ -175,102 +175,59 @@ function ReferenceSettings(): JSX.Element {
   )
 }
 
-const LLM_KEYS = {
-  LLM_PROVIDER: 'local',
-  OLLAMA_URL: 'http://localhost:11434',
-  OLLAMA_MODEL: '',
-  DIALOGUE_PROMPT_TEMPLATE: '',
-  GROK_API_KEY: '',
-  GROK_MODEL: 'grok-4.3'
-} as const
+const GROK_KEYS = { GROK_API_KEY: '', GROK_MODEL: 'grok-4.3' } as const
 
-function LlmSettings(): JSX.Element {
-  const { vals, loaded, save } = useSettingsForm(LLM_KEYS)
+function GrokSettings(): JSX.Element {
+  const toast = useToast()
+  const { vals, loaded, save } = useSettingsForm(GROK_KEYS)
+  const [testing, setTesting] = useState(false)
   if (!loaded) return <></>
 
-  const provider = vals.LLM_PROVIDER || 'local'
+  async function test(): Promise<void> {
+    setTesting(true)
+    try {
+      const r = await api.grok.test()
+      toast.success(`接続OK（${r.name}）`)
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setTesting(false)
+    }
+  }
 
   return (
     <div className="space-y-3">
-      <label className="block sm:max-w-xs">
-        <span className="mb-1 block text-xs text-ink-500">生成エンジン</span>
-        <select
-          value={provider}
-          onChange={(e) => save('LLM_PROVIDER', e.target.value)}
-          className="w-full rounded-md border border-ink-600 bg-ink-900 px-2 py-2 text-sm"
-        >
-          <option value="local">ローカル（Ollama）</option>
-          <option value="grok">リモート（Grok / xAI）</option>
-        </select>
-      </label>
-
-      {provider === 'grok' && (
-        <div className="space-y-3 rounded-md border border-ink-700 bg-ink-900/40 p-3">
-          <p className="text-xs text-ink-500">
-            xAI の Grok API でセリフを生成します。送信内容は xAI に送られます。露骨な表現は規約上拒否されることがあります。
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:max-w-lg">
-            <label className="block">
-              <span className="mb-1 block text-xs text-ink-500">API キー</span>
-              <input
-                type="password"
-                defaultValue={vals.GROK_API_KEY}
-                onBlur={(e) => e.target.value !== vals.GROK_API_KEY && save('GROK_API_KEY', e.target.value)}
-                placeholder="xai-..."
-                className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs text-ink-500">モデル名</span>
-              <input
-                defaultValue={vals.GROK_MODEL}
-                onBlur={(e) => e.target.value !== vals.GROK_MODEL && save('GROK_MODEL', e.target.value)}
-                placeholder="grok-4.3"
-                className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
-              />
-            </label>
-          </div>
-        </div>
-      )}
-
       <p className="text-xs text-ink-500">
-        ローカル（Ollama）の設定 — `ollama serve` を起動し、使うモデルを pull しておいてください。
+        セリフ・記事文を xAI の Grok API で生成します。送信内容は xAI に送られます（露骨な表現は規約上拒否されることがあります）。
       </p>
       <div className="grid grid-cols-2 gap-3 sm:max-w-lg">
         <label className="block">
-          <span className="mb-1 block text-xs text-ink-500">エンドポイント URL</span>
+          <span className="mb-1 block text-xs text-ink-500">API キー</span>
           <input
-            defaultValue={vals.OLLAMA_URL}
-            onBlur={(e) => e.target.value !== vals.OLLAMA_URL && save('OLLAMA_URL', e.target.value)}
-            placeholder="http://localhost:11434"
+            type="password"
+            defaultValue={vals.GROK_API_KEY}
+            onBlur={(e) => e.target.value !== vals.GROK_API_KEY && save('GROK_API_KEY', e.target.value)}
+            placeholder="xai-..."
             className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
           />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs text-ink-500">モデル名</span>
           <input
-            defaultValue={vals.OLLAMA_MODEL}
-            onBlur={(e) => e.target.value !== vals.OLLAMA_MODEL && save('OLLAMA_MODEL', e.target.value)}
-            placeholder="例: ninja-nsfw-rp（日本語RP推奨）"
+            defaultValue={vals.GROK_MODEL}
+            onBlur={(e) => e.target.value !== vals.GROK_MODEL && save('GROK_MODEL', e.target.value)}
+            placeholder="grok-4.3"
             className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
           />
         </label>
       </div>
-      <label className="block sm:max-w-lg">
-        <span className="mb-1 block text-xs text-ink-500">
-          セリフ用プロンプトテンプレ（空欄なら既定。使える差し込み: {'{character} {traits} {story} {story_desc} {situation}'}）
-        </span>
-        <textarea
-          defaultValue={vals.DIALOGUE_PROMPT_TEMPLATE}
-          onBlur={(e) =>
-            e.target.value !== vals.DIALOGUE_PROMPT_TEMPLATE &&
-            save('DIALOGUE_PROMPT_TEMPLATE', e.target.value)
-          }
-          rows={4}
-          placeholder="空欄なら既定テンプレ（キャラ／特徴／物語／状況からセリフ1行を生成）を使用"
-          className="w-full resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent/60"
-        />
-      </label>
+      <button
+        onClick={test}
+        disabled={testing}
+        className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+      >
+        {testing ? '確認中…' : '疎通確認'}
+      </button>
     </div>
   )
 }
@@ -461,6 +418,16 @@ export default function Settings(): JSX.Element {
     refreshAnlas()
   }
 
+  async function testToken(): Promise<void> {
+    try {
+      const a = await api.novelai.anlas()
+      setAnlas(a)
+      toast.success(`接続OK（残りAnlas: ${a.toLocaleString()}）`)
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-6 py-6">
       <h1 className="mb-3 text-xl font-semibold">設定</h1>
@@ -498,6 +465,12 @@ export default function Settings(): JSX.Element {
           >
             更新
           </button>
+          <button
+            onClick={testToken}
+            className="rounded border border-ink-600 px-2 py-0.5 text-ink-300 hover:border-accent/60 hover:text-accent"
+          >
+            疎通確認
+          </button>
         </div>
       </SettingsCard>
 
@@ -507,8 +480,8 @@ export default function Settings(): JSX.Element {
       <SettingsCard title="キャラ試し撃ち（プレビュー）">
         <PreviewSettings />
       </SettingsCard>
-      <SettingsCard title="文章生成（LLM）">
-        <LlmSettings />
+      <SettingsCard title="Grok設定">
+        <GrokSettings />
       </SettingsCard>
       <SettingsCard title="WordPress 投稿">
         <WpSettings />

@@ -2,7 +2,7 @@
 // /chat/completions endpoint. Unlike the local novel model, Grok follows
 // instructions well, so we do selection + voice restyle in a single call (no
 // seed/[INST] tricks needed).
-import type { DialogueContext } from './ollama'
+import type { DialogueContext } from './dialogue-types'
 import { xaiChat } from './xai'
 import { classifyScene, cleanGrokLine } from './grok-format'
 

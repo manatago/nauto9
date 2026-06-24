@@ -47,3 +47,21 @@ export async function xaiChat(
   const data = (await res.json()) as { choices?: { message?: { content?: string } }[] }
   return data.choices?.[0]?.message?.content ?? ''
 }
+
+// Validate the API key without consuming tokens (GET /v1/api-key).
+export async function testApiKey(): Promise<{ name: string }> {
+  const apiKey = (repo.getSetting('GROK_API_KEY') || '').trim()
+  if (!apiKey) throw new Error('Grok の APIキーが未設定です（設定画面で入力してください）')
+  let res: Response
+  try {
+    res = await fetch('https://api.x.ai/v1/api-key', {
+      headers: { Authorization: `Bearer ${apiKey}` }
+    })
+  } catch {
+    throw new Error('Grok API に接続できません（ネットワークを確認してください）')
+  }
+  if (res.status === 401 || res.status === 403) throw new Error('Grok APIキーが無効です')
+  if (!res.ok) throw new Error(`Grok HTTP ${res.status}`)
+  const data = (await res.json()) as { name?: string; redacted_api_key?: string }
+  return { name: data.name || data.redacted_api_key || 'OK' }
+}
