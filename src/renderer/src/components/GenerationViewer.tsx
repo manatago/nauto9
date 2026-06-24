@@ -280,23 +280,33 @@ export default function GenerationViewer({
     }
     setBusy(true)
     try {
-      // composite the white strokes onto a black background = the NAI mask
+      // NAI v4 snaps the mask to the 8px latent grid (resize_to_naimask): downscale
+      // ×1/8 then back up ×8 with nearest. Doing this binarizes per-block, killing
+      // the anti-aliased gray edges that left a seam. Output = white (redraw) on
+      // transparent, matching NAI's mask format.
+      const sw = Math.max(1, Math.round(mask.width / 8))
+      const sh = Math.max(1, Math.round(mask.height / 8))
+      const small = document.createElement('canvas')
+      small.width = sw
+      small.height = sh
+      const sctx = small.getContext('2d')
+      if (!sctx) throw new Error('canvas が使えません')
+      sctx.imageSmoothingEnabled = false
+      sctx.drawImage(mask, 0, 0, sw, sh)
+
       const out = document.createElement('canvas')
       out.width = mask.width
       out.height = mask.height
       const octx = out.getContext('2d')
       if (!octx) throw new Error('canvas が使えません')
-      octx.fillStyle = '#000000'
-      octx.fillRect(0, 0, out.width, out.height)
-      octx.drawImage(mask, 0, 0)
-      // Binarize: the brush is anti-aliased, so edges composite to gray — which
-      // NAI treats as partial inpaint and leaves a gray seam. Force pure B/W.
+      octx.imageSmoothingEnabled = false
+      octx.drawImage(small, 0, 0, out.width, out.height)
       const id = octx.getImageData(0, 0, out.width, out.height)
       const px = id.data
       for (let i = 0; i < px.length; i += 4) {
-        const v = px[i] > 64 ? 255 : 0
-        px[i] = px[i + 1] = px[i + 2] = v
-        px[i + 3] = 255
+        const painted = px[i + 3] > 32 // any painted alpha in this block
+        px[i] = px[i + 1] = px[i + 2] = painted ? 255 : 0
+        px[i + 3] = painted ? 255 : 0
       }
       octx.putImageData(id, 0, 0)
       const prev = await api.generations.imageData(cur.id)
