@@ -1,25 +1,24 @@
-import { BookOpen, FileText, Images, Settings as SettingsIcon, Users, Wand2 } from 'lucide-react'
 import heroUrl from '../assets/hero.png'
+import listIcon from '../assets/icons/list.png'
+import situationsIcon from '../assets/icons/situations.png'
+import batchIcon from '../assets/icons/batch.png'
+import galleryIcon from '../assets/icons/gallery.png'
+import articlesIcon from '../assets/icons/articles.png'
+import settingsIcon from '../assets/icons/settings.png'
 
-export type HomeTarget =
-  | 'list'
-  | 'situations'
-  | 'batch'
-  | 'gallery'
-  | 'articles'
-  | 'settings'
+export type HomeTarget = 'list' | 'situations' | 'batch' | 'gallery' | 'articles' | 'settings'
 
 interface Props {
   onNavigate: (target: HomeTarget) => void
 }
 
-const LINKS: { target: HomeTarget; label: string; desc: string; icon: typeof Users }[] = [
-  { target: 'list', label: 'キャラクター', desc: 'プロフィール・参照画像', icon: Users },
-  { target: 'situations', label: 'シチュエーション', desc: 'ストーリーと場面', icon: BookOpen },
-  { target: 'batch', label: '一括生成', desc: 'キャラ×シチュをまとめて', icon: Wand2 },
-  { target: 'gallery', label: 'ギャラリー', desc: '生成画像・セリフ', icon: Images },
-  { target: 'articles', label: '記事', desc: 'WordPress下書き', icon: FileText },
-  { target: 'settings', label: '設定', desc: 'トークン・LLM・WP', icon: SettingsIcon }
+const LINKS: { target: HomeTarget; label: string; desc: string; img: string }[] = [
+  { target: 'list', label: 'キャラクター', desc: 'プロフィール・参照画像', img: listIcon },
+  { target: 'situations', label: 'シチュエーション', desc: 'ストーリーと場面', img: situationsIcon },
+  { target: 'batch', label: '一括生成', desc: 'キャラ×シチュをまとめて', img: batchIcon },
+  { target: 'gallery', label: 'ギャラリー', desc: '生成画像・セリフ', img: galleryIcon },
+  { target: 'articles', label: '記事', desc: 'WordPress下書き', img: articlesIcon },
+  { target: 'settings', label: '設定', desc: 'トークン・LLM・WP', img: settingsIcon }
 ]
 
 export default function Home({ onNavigate }: Props): JSX.Element {
@@ -36,17 +35,22 @@ export default function Home({ onNavigate }: Props): JSX.Element {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {LINKS.map(({ target, label, desc, icon: Icon }) => (
+      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        {LINKS.map(({ target, label, desc, img }) => (
           <button
             key={target}
             onClick={() => onNavigate(target)}
-            className="group flex flex-col items-start gap-2 rounded-xl border border-ink-700 bg-ink-800/40 p-4 text-left transition hover:border-accent/60 hover:bg-ink-800"
+            className="group relative aspect-square overflow-hidden rounded-2xl ring-1 ring-ink-700 transition hover:ring-accent/60"
           >
-            <Icon size={22} className="text-ink-400 group-hover:text-accent" />
-            <div>
-              <div className="text-sm font-semibold text-ink-100">{label}</div>
-              <div className="text-xs text-ink-500">{desc}</div>
+            <img
+              src={img}
+              alt={label}
+              className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-ink-900/90 via-ink-900/10 to-transparent" />
+            <div className="absolute bottom-0 left-0 p-3 text-left">
+              <div className="text-base font-bold text-white drop-shadow">{label}</div>
+              <div className="text-[11px] text-ink-200/90 drop-shadow">{desc}</div>
             </div>
           </button>
         ))}
