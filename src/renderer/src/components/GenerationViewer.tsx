@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import type { Generation } from '@shared/types'
 import { api } from '../api'
+import { applyFineMosaic } from '../lib/mosaic'
 import { useToast } from './Toast'
 
 interface Props {
@@ -23,51 +24,6 @@ interface Props {
   index: number
   onClose: () => void
   onChanged: () => void
-}
-
-// nauto8 FINE mosaic: feathered blur(12px) over the dragged region.
-function applyFineMosaic(
-  ctx: CanvasRenderingContext2D,
-  src: HTMLCanvasElement,
-  x: number,
-  y: number,
-  w: number,
-  h: number
-): void {
-  if (w < 6 || h < 6) return
-  const temp = document.createElement('canvas')
-  temp.width = w
-  temp.height = h
-  const tctx = temp.getContext('2d')
-  if (!tctx) return
-  tctx.drawImage(src, x, y, w, h, 0, 0, w, h)
-  tctx.filter = 'blur(12px)'
-  tctx.drawImage(temp, 0, 0)
-  tctx.filter = 'none'
-
-  const inset = Math.min(10, Math.floor(Math.min(w, h) / 3))
-  const mask = document.createElement('canvas')
-  mask.width = w
-  mask.height = h
-  const mctx = mask.getContext('2d')
-  if (!mctx) return
-  mctx.shadowColor = 'white'
-  mctx.shadowBlur = 15
-  mctx.fillStyle = 'white'
-  const iw = Math.max(1, w - inset * 2)
-  const ih = Math.max(1, h - inset * 2)
-  if (typeof mctx.roundRect === 'function') {
-    mctx.beginPath()
-    mctx.roundRect(inset, inset, iw, ih, Math.min(20, iw / 2, ih / 2))
-    mctx.fill()
-  } else {
-    mctx.fillRect(inset, inset, iw, ih)
-  }
-
-  tctx.globalCompositeOperation = 'destination-in'
-  tctx.drawImage(mask, 0, 0)
-  tctx.globalCompositeOperation = 'source-over'
-  ctx.drawImage(temp, x, y)
 }
 
 export default function GenerationViewer({

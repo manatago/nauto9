@@ -1,8 +1,18 @@
 import { useState } from 'react'
-import { ChevronDown, Download, FileText, Loader2, MessageSquare, Trash2, TriangleAlert } from 'lucide-react'
+import {
+  ChevronDown,
+  Download,
+  FileText,
+  Loader2,
+  MessageSquare,
+  Trash2,
+  TriangleAlert,
+  Wand2
+} from 'lucide-react'
 import type { Batch, BatchStatus, Generation } from '@shared/types'
 import { api, useBatches } from '../api'
 import { useToast } from '../components/Toast'
+import { autoMosaicGeneration } from '../lib/mosaic'
 import GenerationViewer from '../components/GenerationViewer'
 import ArticlePreview from '../components/ArticlePreview'
 
@@ -57,6 +67,9 @@ export default function Gallery(): JSX.Element {
   const [articleBatch, setArticleBatch] = useState<number | null>(null)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [downloading, setDownloading] = useState<number | null>(null)
+  const [mosaicking, setMosaicking] = useState<{ id: number; done: number; total: number } | null>(
+    null
+  )
 
   const toggleExpand = (id: number): void =>
     setExpanded((s) => {
@@ -79,6 +92,31 @@ export default function Gallery(): JSX.Element {
       toast.error((e as Error).message)
     } finally {
       setDownloading(null)
+    }
+  }
+
+  // Detect genitals in every image of the batch and burn in a FINE mosaic.
+  // Overwrites the original images (per-image undo is only in the single viewer).
+  async function batchMosaic(b: Batch): Promise<void> {
+    const gens = successOf(b)
+    if (!gens.length) return
+    if (!confirm(`「${b.name}」の ${gens.length} 枚を自動モザイクします。元画像は上書きされます。`))
+      return
+    setMosaicking({ id: b.id, done: 0, total: gens.length })
+    let changed = 0
+    try {
+      for (let i = 0; i < gens.length; i++) {
+        try {
+          if ((await autoMosaicGeneration(gens[i].id)) > 0) changed++
+        } catch (e) {
+          console.error('auto-mosaic failed for', gens[i].id, e)
+        }
+        setMosaicking({ id: b.id, done: i + 1, total: gens.length })
+      }
+      mutate()
+      toast.success(`${changed}/${gens.length} 枚にモザイクを適用しました`)
+    } finally {
+      setMosaicking(null)
     }
   }
 
@@ -226,6 +264,20 @@ export default function Gallery(): JSX.Element {
                               スライドショー
                             </button>
                           )}
+                          <button
+                            onClick={() => batchMosaic(b)}
+                            disabled={success.length === 0 || mosaicking !== null}
+                            className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+                          >
+                            {mosaicking?.id === b.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Wand2 size={14} />
+                            )}
+                            {mosaicking?.id === b.id
+                              ? `モザイク ${mosaicking.done}/${mosaicking.total}`
+                              : '一括モザイク'}
+                          </button>
                           <button
                             onClick={() => genDialogues(b)}
                             disabled={success.length === 0 || b.dialogue_running}
