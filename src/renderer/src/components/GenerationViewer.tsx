@@ -54,6 +54,9 @@ export default function GenerationViewer({
   const maskRef = useRef<HTMLCanvasElement>(null)
   const dragRef = useRef<{ x: number; y: number } | null>(null)
   const paintRef = useRef<{ x: number; y: number } | null>(null)
+  // Clear the mask only on a fresh entry into inpaint mode. After a re-描画 the
+  // image reloads but we keep the painted region so it can be redrawn again.
+  const resetMaskRef = useRef(true)
 
   const cur = generations[idx]
   const go = useCallback(
@@ -115,12 +118,18 @@ export default function GenerationViewer({
         canvas.width = img.naturalWidth
         canvas.height = img.naturalHeight
         canvas.getContext('2d')?.drawImage(img, 0, 0)
-        // inpaint: a transparent mask layer the same size as the image
+        // inpaint: a transparent mask layer the same size as the image. Reset it
+        // on a fresh entry or a size change; otherwise (the reload after a re-描画)
+        // keep the painted region so the same area can be redrawn repeatedly.
         const mask = maskRef.current
         if (inpaint && mask) {
-          mask.width = img.naturalWidth
-          mask.height = img.naturalHeight
-          mask.getContext('2d')?.clearRect(0, 0, mask.width, mask.height)
+          const sizeChanged = mask.width !== img.naturalWidth || mask.height !== img.naturalHeight
+          if (resetMaskRef.current || sizeChanged) {
+            mask.width = img.naturalWidth
+            mask.height = img.naturalHeight
+            mask.getContext('2d')?.clearRect(0, 0, mask.width, mask.height)
+            resetMaskRef.current = false
+          }
         }
       }
       img.src = dataUrl
@@ -268,9 +277,10 @@ export default function GenerationViewer({
       octx.putImageData(id, 0, 0)
       const prev = await api.generations.imageData(cur.id)
       await api.generations.inpaint(cur.id, out.toDataURL('image/png'), inpaintPrompt.trim())
+      // Stay in inpaint mode with the mask intact (resetMaskRef stays false) so the
+      // image reloads to show the result while the same region can be redrawn again.
       onChanged()
       setUndoData(prev)
-      setInpaint(false)
       toast.success('部分再描画しました')
     } catch (e) {
       toast.error((e as Error).message)
@@ -605,7 +615,7 @@ export default function GenerationViewer({
               onClick={() => setInpaint(false)}
               className="shrink-0 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-300 hover:bg-white/10"
             >
-              キャンセル
+              完了
             </button>
           </div>
         ) : (
@@ -667,6 +677,7 @@ export default function GenerationViewer({
                 setPlaying(false)
                 setEditOpen(false)
                 setInpaintPrompt('')
+                resetMaskRef.current = true // fresh mask on entry
                 setInpaint(true)
               }}
               className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:bg-white/10"
