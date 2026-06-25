@@ -221,10 +221,11 @@ export default function Gallery(): JSX.Element {
                         <img
                           src={cover}
                           alt=""
-                          className="absolute inset-0 h-full w-full object-cover opacity-25"
+                          className="absolute inset-0 h-full w-full object-cover opacity-70"
                         />
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-ink-900/95 via-ink-900/30 to-ink-900/50" />
+                      {/* keep the bottom dark for the name/meta text; lighten the rest */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-ink-900/90 via-ink-900/10 to-transparent" />
                       <div className="absolute inset-0 flex flex-col justify-between p-3">
                         <div className="flex justify-end">{statusBadge}</div>
                         <div>
