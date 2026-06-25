@@ -21,6 +21,7 @@ import * as articleRepo from '../db/articles'
 import { testConnection, wpConfigFrom } from '../services/wordpress'
 import { testApiKey } from '../services/xai'
 import { generateImage, getAnlas, inpaint } from '../services/novelai'
+import { detectCensors } from '../services/censor'
 import { buildReferenceParams, referenceMode } from '../services/reference'
 import { decodeDataUrl, mediaUrl, saveImage, saveImageWithName, thumbKey } from '../services/images'
 import { applyCharacterReplacements, replaceXxx, stripEyeTagsIfClosed } from '../services/prompt'
@@ -269,6 +270,14 @@ export function registerIpc(): void {
     saveImageWithName(posix.dirname(key), posix.basename(key), png)
     batchRepo.setGenerationImage(id, key)
     return batchRepo.getGeneration(id)
+  })
+
+  // detect genital regions to suggest mosaic boxes (returns original-px coords)
+  handle('generations:detectCensor', async (id: number, opts?: { conf?: number; pad?: number }) => {
+    const g = batchRepo.getGeneration(id)
+    if (!g || !g.image_path) throw new Error('生成画像が見つかりません')
+    const png = readFileSync(storagePathFor(g.image_path))
+    return detectCensors(png, { conf: opts?.conf, pad: opts?.pad })
   })
 
   // settings

@@ -11,6 +11,7 @@ import {
   RefreshCw,
   SquareDashedMousePointer,
   Undo2,
+  Wand2,
   X
 } from 'lucide-react'
 import type { Generation } from '@shared/types'
@@ -394,6 +395,27 @@ export default function GenerationViewer({
     api.generations.setDialogue(cur.id, dialogue).then(() => onChanged())
   }
 
+  // auto-detect genitals and blur each box (user can still tweak / add manually)
+  async function autoDetect(): Promise<void> {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext('2d')
+    if (!canvas || !ctx) return
+    setBusy(true)
+    try {
+      const boxes = await api.generations.detectCensor(cur.id)
+      if (!boxes.length) {
+        toast.push('検出なし — 手動で囲ってください')
+        return
+      }
+      for (const b of boxes) applyFineMosaic(ctx, canvas, b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0)
+      toast.success(`${boxes.length}か所を自動モザイク`)
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function saveMosaic(): Promise<void> {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -554,7 +576,14 @@ export default function GenerationViewer({
       <div className="flex items-center justify-center gap-2 px-4 py-3">
         {mosaic ? (
           <>
-            <span className="mr-2 text-xs text-ink-500">隠したい部分をドラッグで囲む（FINE）</span>
+            <span className="mr-2 text-xs text-ink-500">ドラッグで囲む（FINE）／自動検出で局部を一括</span>
+            <button
+              onClick={autoDetect}
+              disabled={busy}
+              className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:bg-white/10 disabled:opacity-50"
+            >
+              {busy ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={15} />} 自動検出
+            </button>
             <button
               onClick={saveMosaic}
               disabled={busy}

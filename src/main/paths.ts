@@ -29,3 +29,12 @@ export function storageRoot(): string {
 export function storagePathFor(logicalKey: string): string {
   return join(storageRoot(), logicalKey)
 }
+
+// Bundled read-only resources (models, etc.). asarUnpack ships resources/** to
+// app.asar.unpacked in a packaged build; in dev they sit at the project root.
+export function resourcePath(...segs: string[]): string {
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'app.asar.unpacked', 'resources', ...segs)
+  }
+  return join(app.getAppPath(), 'resources', ...segs)
+}

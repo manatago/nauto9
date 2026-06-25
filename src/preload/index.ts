@@ -67,6 +67,7 @@ const api: Api = {
     saveImage: (id, dataUrl) => invoke('generations:saveImage', id, dataUrl) as Promise<never>,
     inpaint: (id, maskDataUrl, prompt) =>
       invoke('generations:inpaint', id, maskDataUrl, prompt) as Promise<never>,
+    detectCensor: (id, opts) => invoke('generations:detectCensor', id, opts) as Promise<never>,
     generateDialogue: (id) => invoke('generations:generateDialogue', id) as Promise<never>,
     setDialogue: (id, text) => invoke('generations:setDialogue', id, text) as Promise<never>
   },

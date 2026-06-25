@@ -10,3 +10,4 @@ dist/
 .smoke-data/
 .dev-data.bak/
 *.tsbuildinfo
+.detect-exp/

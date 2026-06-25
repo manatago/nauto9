@@ -173,6 +173,20 @@ export interface SituationUpdateInput {
   tag_ids?: number[]
 }
 
+// ---- NSFW part detection (auto-mosaic suggestions) ----
+
+export type CensorLabel = 'nipple_f' | 'penis' | 'pussy'
+
+// A detected region in ORIGINAL image pixel coordinates.
+export interface CensorBox {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+  label: CensorLabel
+  score: number
+}
+
 // ---- articles (WordPress draft composition) ----
 
 export type ArticleBlockKind = 'h2' | 'chapterDesc' | 'dialogue' | 'image' | 'customHtml'
@@ -353,6 +367,7 @@ export interface Api {
     imageData(id: number): Promise<string> // data: URL (clean for canvas editing)
     saveImage(id: number, dataUrl: string): Promise<Generation> // save edited (mosaic) image
     inpaint(id: number, maskDataUrl: string, prompt: string): Promise<Generation> // redraw masked region
+    detectCensor(id: number, opts?: { conf?: number; pad?: number }): Promise<CensorBox[]> // suggest genital mosaic regions
     generateDialogue(id: number): Promise<Generation> // LLM line for one image
     setDialogue(id: number, text: string): Promise<Generation> // manual edit
   }
