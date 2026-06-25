@@ -9,6 +9,19 @@ files:
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  # NEVER ship local data / scratch dirs — .dev-data holds the user's real
+  # private images & DB. (resources/ is shipped via asarUnpack above.)
+  - '!.dev-data*'
+  - '!.smoke'
+  - '!.smoke-data'
+  - '!.detect-exp'
+  - '!build'
+  - '!dist'
+  - '!docs'
+  - '!models'
+  - '!scripts'
+  - '!test'
+  - '!*.tsbuildinfo'
 asarUnpack:
   - resources/**
   - '**/node_modules/better-sqlite3/**'
