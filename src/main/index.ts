@@ -1,7 +1,9 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, nativeImage, shell } from 'electron'
+import { existsSync } from 'fs'
 import { join } from 'path'
 import { registerMediaProtocol, registerMediaSchemePrivileges } from './protocol'
 import { registerIpc } from './ipc'
+import { resourcePath } from './paths'
 import { getDb, closeDb } from './db'
 
 registerMediaSchemePrivileges()
@@ -51,6 +53,12 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // In dev the Dock shows Electron's default icon; point it at our app icon.
+  // (Packaged builds get the icon from the .app bundle via electron-builder.)
+  if (!app.isPackaged && process.platform === 'darwin') {
+    const iconPath = resourcePath('icon.png')
+    if (existsSync(iconPath)) app.dock?.setIcon(nativeImage.createFromPath(iconPath))
+  }
   registerMediaProtocol()
   getDb() // open + migrate + seed eagerly so first IPC call is fast
   registerIpc()

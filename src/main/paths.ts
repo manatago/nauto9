@@ -6,7 +6,7 @@ import { mkdirSync } from 'fs'
 //   - NAUTO9_DATA_DIR env override (used by tests so they NEVER touch real data)
 //   - packaged: OS userData directory
 //   - dev: ./.dev-data next to the project (easy to inspect)
-function dataRoot(): string {
+export function dataRoot(): string {
   if (process.env.NAUTO9_DATA_DIR) return process.env.NAUTO9_DATA_DIR
   if (app.isPackaged) return join(app.getPath('userData'), 'data')
   return join(app.getAppPath(), '.dev-data')

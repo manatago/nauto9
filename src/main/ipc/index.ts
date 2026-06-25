@@ -22,6 +22,7 @@ import { testConnection, wpConfigFrom } from '../services/wordpress'
 import { testApiKey } from '../services/xai'
 import { generateImage, getAnlas, inpaint } from '../services/novelai'
 import { detectCensors } from '../services/censor'
+import { exportData, importData } from '../services/backup'
 import { buildReferenceParams, referenceMode } from '../services/reference'
 import {
   backupOriginal,
@@ -311,6 +312,10 @@ export function registerIpc(): void {
   // settings
   handle('settings:get', (key: string) => repo.getSetting(key))
   handle('settings:set', (key: string, value: string) => repo.setSetting(key, value))
+
+  // data backup (export the whole DB + image library to one zip, or restore one)
+  ipcMain.handle('backup:export', (e) => exportData(BrowserWindow.fromWebContents(e.sender)))
+  ipcMain.handle('backup:import', (e) => importData(BrowserWindow.fromWebContents(e.sender)))
 
   // preview (NovelAI test shot)
   handle(

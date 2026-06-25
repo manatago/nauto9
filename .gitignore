@@ -1,13 +1,18 @@
 node_modules/
 out/
 dist/
-.dev-data/
+# Local data: the real DB + image library. Never commit — all user content lives
+# only here. (The app icon under build/ and resources/ IS committed.)
+.dev-data*
 *.log
 .DS_Store
 .env
 .env.*
 .smoke/
 .smoke-data/
-.dev-data.bak/
 *.tsbuildinfo
 .detect-exp/
+# Backup export/import scratch + aside dirs (created next to the data dir).
+.import-tmp-*/
+# Backup archives, in case one is written into the repo by accident.
+nauto9-backup-*.zip

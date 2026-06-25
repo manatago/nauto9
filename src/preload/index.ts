@@ -94,6 +94,10 @@ const api: Api = {
     get: (key) => invoke('settings:get', key) as Promise<never>,
     set: (key, value) => invoke('settings:set', key, value) as Promise<never>
   },
+  backup: {
+    export: () => invoke('backup:export') as Promise<never>,
+    import: () => invoke('backup:import') as Promise<never>
+  },
   preview: {
     run: (characterId, situationPrompt) =>
       invoke('preview:run', characterId, situationPrompt) as Promise<never>

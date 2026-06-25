@@ -396,6 +396,11 @@ export interface Api {
     get(key: string): Promise<string | null>
     set(key: string, value: string): Promise<void>
   }
+  // Whole-library backup: bundle DB + images into a zip, or restore from one.
+  backup: {
+    export(): Promise<{ saved: string | null }> // null when the user cancels
+    import(): Promise<{ imported: boolean }> // app relaunches/exits on success
+  }
   preview: {
     run(characterId: number, situationPrompt?: string): Promise<PreviewResult>
   }

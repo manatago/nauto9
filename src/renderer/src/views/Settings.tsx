@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Download, Plus, Trash2, Upload } from 'lucide-react'
 import { api } from '../api'
 import { useToast } from '../components/Toast'
 
@@ -388,6 +388,65 @@ function AdSettings(): JSX.Element {
   )
 }
 
+function BackupSettings(): JSX.Element {
+  const toast = useToast()
+  const [busy, setBusy] = useState<'export' | 'import' | null>(null)
+
+  async function doExport(): Promise<void> {
+    setBusy('export')
+    try {
+      const r = await api.backup.export()
+      if (r.saved) toast.success('エクスポートしました')
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function doImport(): Promise<void> {
+    const ok = confirm(
+      '現在のデータ（キャラ・画像・生成結果すべて）をバックアップの内容で置き換えます。\n' +
+        '現在のデータは念のため別フォルダに退避され、完了後アプリが再起動します。続けますか？'
+    )
+    if (!ok) return
+    setBusy('import')
+    try {
+      // On success the main process relaunches/exits, so this rarely returns.
+      const r = await api.backup.import()
+      if (!r.imported) setBusy(null)
+    } catch (e) {
+      toast.error((e as Error).message)
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-ink-500">
+        データベースと画像をまとめて1つの .zip に書き出します。別PCへの移行や定期バックアップに。
+        インポートすると現在のデータは置き換わります（旧データは退避され、アプリが再起動します）。
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={doExport}
+          disabled={busy !== null}
+          className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+        >
+          <Download size={15} /> {busy === 'export' ? '書き出し中…' : 'エクスポート'}
+        </button>
+        <button
+          onClick={doImport}
+          disabled={busy !== null}
+          className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:border-red-400/60 hover:text-red-300 disabled:opacity-40"
+        >
+          <Upload size={15} /> {busy === 'import' ? '取り込み中…' : 'インポート'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Settings(): JSX.Element {
   const toast = useToast()
   const [token, setToken] = useState('')
@@ -488,6 +547,9 @@ export default function Settings(): JSX.Element {
       </SettingsCard>
       <SettingsCard title="広告リンク（2番目以降の h2 直前に挿入）">
         <AdSettings />
+      </SettingsCard>
+      <SettingsCard title="データのバックアップ / 移行">
+        <BackupSettings />
       </SettingsCard>
       </div>
     </div>
