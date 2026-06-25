@@ -37,10 +37,10 @@ function iouOf(a: number[], b: number[]): number {
 }
 
 export async function detectCensors(png: Buffer, opts: DetectOptions = {}): Promise<CensorBox[]> {
-  const conf = opts.conf ?? 0.2 // lower than imgutils' 0.3 to miss fewer (genitals only)
+  const conf = opts.conf ?? 0.1 // aggressive recall — miss as few genitals as possible
   const iou = opts.iou ?? 0.7
   const keep = opts.classes ?? ['penis', 'pussy']
-  const pad = opts.pad ?? 0.25 // grow each box 25%/side for fuller coverage
+  const pad = opts.pad ?? 0.4 // grow each box 40%/side for fuller coverage
 
   const img = nativeImage.createFromBuffer(png)
   const { width: ow, height: oh } = img.getSize()
