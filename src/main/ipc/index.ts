@@ -23,7 +23,15 @@ import { testApiKey } from '../services/xai'
 import { generateImage, getAnlas, inpaint } from '../services/novelai'
 import { detectCensors } from '../services/censor'
 import { buildReferenceParams, referenceMode } from '../services/reference'
-import { decodeDataUrl, mediaUrl, saveImage, saveImageWithName, thumbKey } from '../services/images'
+import {
+  backupOriginal,
+  decodeDataUrl,
+  mediaUrl,
+  readImage,
+  saveImage,
+  saveImageWithName,
+  thumbKey
+} from '../services/images'
 import { applyCharacterReplacements, replaceXxx, stripEyeTagsIfClosed } from '../services/prompt'
 import { generationKey, safeArcName, slug } from '../services/naming'
 import { storagePathFor } from '../paths'
@@ -223,11 +231,28 @@ export function registerIpc(): void {
   handle('generations:saveImage', (id: number, dataUrl: string) => {
     const g = batchRepo.getGenerationRow(id)
     if (!g) throw new Error('生成が見つかりません')
+    // preserve the pre-edit original once, so a mosaic can be reverted later
+    if (!g.original_path && g.image_path) {
+      batchRepo.setGenerationOriginalPath(id, backupOriginal(g.image_path))
+    }
     const name = batchRepo.batchName(g.batch_id) ?? 'batch'
     const { buf } = decodeDataUrl(dataUrl)
     const key = generationKey(name, g.seq, replaceXxx(g.situation_name, g.character_name))
     saveImageWithName(posix.dirname(key), posix.basename(key), buf)
     batchRepo.setGenerationImage(id, key)
+    return batchRepo.getGeneration(id)
+  })
+
+  // revert a mosaicked/inpainted image to its backed-up original
+  handle('generations:restoreOriginal', (id: number) => {
+    const g = batchRepo.getGenerationRow(id)
+    if (!g) throw new Error('生成が見つかりません')
+    if (!g.original_path) throw new Error('元画像のバックアップがありません')
+    const buf = readImage(g.original_path)
+    const name = batchRepo.batchName(g.batch_id) ?? 'batch'
+    const key = generationKey(name, g.seq, replaceXxx(g.situation_name, g.character_name))
+    saveImageWithName(posix.dirname(key), posix.basename(key), buf)
+    batchRepo.setGenerationImage(id, key) // drops the edited image; backup is kept for re-use
     return batchRepo.getGeneration(id)
   })
 
@@ -265,6 +290,9 @@ export function registerIpc(): void {
       negativePrompt: negative
     })
 
+    if (!g.has_original && g.image_path) {
+      batchRepo.setGenerationOriginalPath(id, backupOriginal(g.image_path))
+    }
     const name = batchRepo.batchName(g.batch_id) ?? 'batch'
     const key = generationKey(name, g.seq, replaceXxx(g.situation_name, g.character_name))
     saveImageWithName(posix.dirname(key), posix.basename(key), png)

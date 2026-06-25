@@ -3,7 +3,7 @@ import { rmSync } from 'fs'
 import { join } from 'path'
 import { storageRoot } from '../paths'
 
-const SCHEMA_VERSION = 14
+const SCHEMA_VERSION = 15
 
 // Simple model: a character is a single prompt + tags + reference images.
 // (The earlier clothing/state/outfit layer was removed — make separate
@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS generations (
   character_name TEXT NOT NULL DEFAULT '',
   dialogue TEXT NOT NULL DEFAULT '',
   image_path TEXT,
+  original_path TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   error TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -226,6 +227,11 @@ export function migrate(db: Database.Database): void {
   if (v < 14) {
     // h3 heading source per saved article (dialogue line vs image name).
     addColumnIfMissing(db, 'articles', 'h3_mode', "TEXT NOT NULL DEFAULT 'dialogue'")
+  }
+  if (v < 15) {
+    // Backup of the pre-edit original image (set on the first mosaic/inpaint),
+    // so an unwanted edit can be reverted. NULL = never edited.
+    addColumnIfMissing(db, 'generations', 'original_path', 'TEXT')
   }
 
   db.pragma(`user_version = ${SCHEMA_VERSION}`)

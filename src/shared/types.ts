@@ -111,6 +111,7 @@ export interface Generation {
   thumbnail_url: string | null
   status: GenerationStatus
   error: string | null
+  has_original: boolean // a pre-edit original is backed up (mosaic/inpaint can be reverted)
   created_at: string
 }
 
@@ -368,6 +369,7 @@ export interface Api {
     saveImage(id: number, dataUrl: string): Promise<Generation> // save edited (mosaic) image
     inpaint(id: number, maskDataUrl: string, prompt: string): Promise<Generation> // redraw masked region
     detectCensor(id: number, opts?: { conf?: number; pad?: number }): Promise<CensorBox[]> // suggest genital mosaic regions
+    restoreOriginal(id: number): Promise<Generation> // revert to the pre-edit (pre-mosaic) original
     generateDialogue(id: number): Promise<Generation> // LLM line for one image
     setDialogue(id: number, text: string): Promise<Generation> // manual edit
   }

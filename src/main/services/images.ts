@@ -1,6 +1,6 @@
 import { nativeImage } from 'electron'
 import { randomBytes } from 'crypto'
-import { mkdirSync, writeFileSync, existsSync, rmSync } from 'fs'
+import { mkdirSync, writeFileSync, existsSync, rmSync, copyFileSync, readFileSync } from 'fs'
 import { dirname, posix } from 'path'
 import { storagePathFor } from '../paths'
 
@@ -54,6 +54,24 @@ export function saveImageWithName(logicalDir: string, filename: string, buf: Buf
   writeFileEnsured(storagePathFor(imageKey), buf)
   makeThumbnail(buf, storagePathFor(thumbKey(imageKey)))
   return imageKey
+}
+
+// Copy an image to a stable backup slot (<dir>/.original/<basename>) and return
+// that key. Used to preserve the pre-edit original before a mosaic/inpaint.
+export function backupOriginal(imageKey: string): string {
+  const backupKey = posix.join(posix.dirname(imageKey), '.original', posix.basename(imageKey))
+  const src = storagePathFor(imageKey)
+  const dst = storagePathFor(backupKey)
+  if (existsSync(src) && !existsSync(dst)) {
+    mkdirSync(dirname(dst), { recursive: true })
+    copyFileSync(src, dst)
+  }
+  return backupKey
+}
+
+// Read a backed-up original image buffer (for restoring it as the current image).
+export function readImage(imageKey: string): Buffer {
+  return readFileSync(storagePathFor(imageKey))
 }
 
 export function deleteImage(imageKey: string): void {

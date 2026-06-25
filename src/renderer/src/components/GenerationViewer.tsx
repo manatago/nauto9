@@ -310,6 +310,21 @@ export default function GenerationViewer({
     }
   }
 
+  // Revert to the backed-up pre-edit original (e.g. an unwanted auto-mosaic).
+  async function restoreOriginal(): Promise<void> {
+    setBusy(true)
+    try {
+      await api.generations.restoreOriginal(cur.id)
+      onChanged()
+      setUndoData(null)
+      toast.success('モザイク前の画像に戻しました')
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   // Persist edited prompts back to the source character & situation records,
   // then optionally regenerate this image with the updated prompts.
   async function saveEdits(thenRegen: boolean): Promise<void> {
@@ -617,7 +632,7 @@ export default function GenerationViewer({
             >
               <Pencil size={15} /> プロンプト編集
             </button>
-            {undoData && (
+            {undoData ? (
               <button
                 onClick={undo}
                 disabled={busy}
@@ -625,6 +640,17 @@ export default function GenerationViewer({
               >
                 <Undo2 size={15} /> 元に戻す
               </button>
+            ) : (
+              cur.has_original && (
+                <button
+                  onClick={restoreOriginal}
+                  disabled={busy}
+                  className="flex items-center gap-1.5 rounded-md border border-accent/50 px-3 py-1.5 text-sm text-accent hover:bg-accent/10 disabled:opacity-50"
+                  title="モザイク/再描画前のオリジナルに戻す"
+                >
+                  <Undo2 size={15} /> モザイク前に戻す
+                </button>
+              )
             )}
             <button
               onClick={() => {

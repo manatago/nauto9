@@ -29,6 +29,7 @@ function toGeneration(r: Row): Generation {
     thumbnail_url: thumbUrlOrNull(path),
     status: r.status as GenerationStatus,
     error: (r.error as string | null) ?? null,
+    has_original: !!(r.original_path as string | null),
     created_at: r.created_at as string
   }
 }
@@ -268,15 +269,20 @@ export interface GenerationRow {
   situation_name: string
   character_name: string
   image_path: string | null
+  original_path: string | null
 }
 
 export function getGenerationRow(id: number): GenerationRow | null {
   const r = getDb()
     .prepare(
-      'SELECT id, batch_id, situation_id, character_id, seq, situation_name, character_name, image_path FROM generations WHERE id = ?'
+      'SELECT id, batch_id, situation_id, character_id, seq, situation_name, character_name, image_path, original_path FROM generations WHERE id = ?'
     )
     .get(id) as GenerationRow | undefined
   return r ?? null
+}
+
+export function setGenerationOriginalPath(id: number, originalPath: string): void {
+  getDb().prepare('UPDATE generations SET original_path = ? WHERE id = ?').run(originalPath, id)
 }
 
 export function getGeneration(id: number): Generation | null {
