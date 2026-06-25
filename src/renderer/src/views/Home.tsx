@@ -12,11 +12,12 @@ interface Props {
   onNavigate: (target: HomeTarget) => void
 }
 
-const LINKS: { target: HomeTarget; label: string; desc: string; img: string }[] = [
+// `imgClass`: per-tile image tweaks (e.g. brightening a dark icon).
+const LINKS: { target: HomeTarget; label: string; desc: string; img: string; imgClass?: string }[] = [
   { target: 'list', label: 'キャラクター', desc: 'プロフィール・参照画像', img: listIcon },
   { target: 'situations', label: 'シチュエーション', desc: 'ストーリーと場面', img: situationsIcon },
   { target: 'batch', label: '一括生成', desc: 'キャラ×シチュをまとめて', img: batchIcon },
-  { target: 'gallery', label: 'ギャラリー', desc: '生成画像・セリフ', img: galleryIcon },
+  { target: 'gallery', label: 'ギャラリー', desc: '生成画像・セリフ', img: galleryIcon, imgClass: 'brightness-150' },
   { target: 'articles', label: '記事', desc: 'WordPress下書き', img: articlesIcon },
   { target: 'settings', label: '設定', desc: 'トークン・LLM・WP', img: settingsIcon }
 ]
@@ -36,7 +37,7 @@ export default function Home({ onNavigate }: Props): JSX.Element {
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {LINKS.map(({ target, label, desc, img }) => (
+        {LINKS.map(({ target, label, desc, img, imgClass }) => (
           <button
             key={target}
             onClick={() => onNavigate(target)}
@@ -46,7 +47,7 @@ export default function Home({ onNavigate }: Props): JSX.Element {
             <img
               src={img}
               alt={label}
-              className="absolute inset-0 h-full w-full scale-[1.4] object-cover transition duration-300 group-hover:scale-[1.5]"
+              className={`absolute inset-0 h-full w-full scale-[1.4] object-cover transition duration-300 group-hover:scale-[1.5] ${imgClass ?? ''}`}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-ink-900/90 via-ink-900/10 to-transparent" />
             <div className="absolute bottom-0 left-0 p-3 text-left">

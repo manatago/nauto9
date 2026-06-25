@@ -39,6 +39,9 @@ export default function GenerationViewer({
   const [inpaint, setInpaint] = useState(false)
   const [inpaintPrompt, setInpaintPrompt] = useState('')
   const [brush, setBrush] = useState(48)
+  // Brush-size preview ring that follows the cursor over the inpaint mask, so the
+  // covered area is visible before painting. Screen px (fixed-positioned).
+  const [cursor, setCursor] = useState<{ x: number; y: number; d: number } | null>(null)
   const [busy, setBusy] = useState(false)
   // Previous image data, kept only right after a regenerate (1-step undo).
   // Cleared on navigation / close.
@@ -222,6 +225,12 @@ export default function GenerationViewer({
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
   }
   function maskMove(e: React.PointerEvent): void {
+    // Always update the brush-size preview ring (in screen px) under the cursor.
+    const m = maskRef.current
+    if (m) {
+      const rect = m.getBoundingClientRect()
+      setCursor({ x: e.clientX, y: e.clientY, d: (brush * rect.width) / m.width })
+    }
     if (!paintRef.current) return
     const p = maskXY(e)
     paintStroke(paintRef.current, p)
@@ -458,8 +467,15 @@ export default function GenerationViewer({
               onPointerDown={maskDown}
               onPointerMove={maskMove}
               onPointerUp={maskUp}
+              onPointerLeave={() => setCursor(null)}
               className="absolute inset-0 m-auto max-h-full max-w-full cursor-crosshair touch-none rounded opacity-50"
             />
+            {cursor && (
+              <div
+                className="pointer-events-none fixed z-[80] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-white mix-blend-difference"
+                style={{ left: cursor.x, top: cursor.y, width: cursor.d, height: cursor.d }}
+              />
+            )}
           </>
         ) : (
           <img src={cur.image_url ?? ''} className="max-h-full max-w-full rounded object-contain" />
@@ -678,6 +694,7 @@ export default function GenerationViewer({
                 setEditOpen(false)
                 setInpaintPrompt('')
                 resetMaskRef.current = true // fresh mask on entry
+                setCursor(null)
                 setInpaint(true)
               }}
               className="flex items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:bg-white/10"
