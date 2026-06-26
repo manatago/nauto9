@@ -409,7 +409,13 @@ export default function GenerationViewer({
       if (!ctx) throw new Error('canvas が使えません')
       ctx.drawImage(img, 0, 0)
 
-      const layout = measureBubble(ctx, text, canvas.width, bubbleStyle === 'auto' ? undefined : bubbleStyle)
+      const layout = measureBubble(
+        ctx,
+        text,
+        canvas.width,
+        canvas.height,
+        bubbleStyle === 'auto' ? undefined : bubbleStyle
+      )
       const place = await api.generations.placeBubble(cur.id, layout.w, layout.h)
       if (place.found) {
         drawBubble(ctx, layout, place.x, place.y, { x: place.tailX, y: place.tailY })

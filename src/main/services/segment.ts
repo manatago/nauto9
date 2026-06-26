@@ -3,6 +3,7 @@ import * as ort from 'onnxruntime-node'
 import type { BubblePlacement } from '@shared/types'
 import { resourcePath } from '../paths'
 import { bestBackgroundBox } from './bubble-place'
+import { detectFaces } from './face'
 
 // Lightweight foreground/background segmentation (rembg U²-Netp, ONNX, ~4.5MB).
 // We don't cut the image out — we only need a ROUGH foreground map to find a
@@ -59,28 +60,41 @@ export async function placeBubble(png: Buffer, boxW: number, boxH: number): Prom
 
   const fg = await foregroundMask(png)
   const best = bestBackgroundBox(fg, SIZE, SIZE, (boxW * SIZE) / W, (boxH * SIZE) / H)
+  const bx = Math.round((best.x * W) / SIZE)
+  const by = Math.round((best.y * H) / SIZE)
 
-  // Foreground centroid (mask space → image px) for the tail target.
-  let sx = 0
-  let sy = 0
-  let sw = 0
-  for (let j = 0; j < SIZE; j++) {
-    for (let i = 0; i < SIZE; i++) {
-      if (fg[j * SIZE + i] > 0.5) {
-        sx += i
-        sy += j
-        sw += 1
+  // Tail target: aim at the speaker's MOUTH. Detect faces and pick the one nearest
+  // the bubble (the character it sits beside); the mouth ≈ lower-center of the box.
+  // Fall back to the foreground centroid when no face is found.
+  let tailX: number
+  let tailY: number
+  const faces = await detectFaces(png).catch(() => [])
+  if (faces.length) {
+    const bcx = bx + boxW / 2
+    const bcy = by + boxH / 2
+    const speaker = faces.reduce((a, b) => {
+      const da = Math.hypot((a.x0 + a.x1) / 2 - bcx, (a.y0 + a.y1) / 2 - bcy)
+      const db = Math.hypot((b.x0 + b.x1) / 2 - bcx, (b.y0 + b.y1) / 2 - bcy)
+      return db < da ? b : a
+    })
+    tailX = Math.round((speaker.x0 + speaker.x1) / 2)
+    tailY = Math.round(speaker.y0 + (speaker.y1 - speaker.y0) * 0.72) // mouth ≈ lower face
+  } else {
+    let sx = 0
+    let sy = 0
+    let sw = 0
+    for (let j = 0; j < SIZE; j++) {
+      for (let i = 0; i < SIZE; i++) {
+        if (fg[j * SIZE + i] > 0.5) {
+          sx += i
+          sy += j
+          sw += 1
+        }
       }
     }
+    tailX = Math.round((((sw ? sx / sw : SIZE / 2) * W) / SIZE))
+    tailY = Math.round((((sw ? sy / sw : SIZE / 2) * H) / SIZE))
   }
-  const cxMask = sw ? sx / sw : SIZE / 2
-  const cyMask = sw ? sy / sw : SIZE / 2
 
-  return {
-    x: Math.round((best.x * W) / SIZE),
-    y: Math.round((best.y * H) / SIZE),
-    found: best.meanFg < 0.2, // mostly-background box available
-    tailX: Math.round((cxMask * W) / SIZE),
-    tailY: Math.round((cyMask * H) / SIZE)
-  }
+  return { x: bx, y: by, found: best.meanFg < 0.2, tailX, tailY }
 }
