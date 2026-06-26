@@ -9,7 +9,7 @@
 
 const FONT = (px: number): string => `bold ${px}px "Hiragino Sans", "Noto Sans JP", sans-serif`
 
-type BalloonStyle = 'oval' | 'cloud' | 'spiky'
+type BalloonStyle = 'rounded' | 'jagged' | 'cloud'
 
 export interface BubbleLayout {
   cols: string[][] // columns of characters; cols[0] is the RIGHTMOST column
@@ -18,19 +18,8 @@ export interface BubbleLayout {
   cellH: number
   style: BalloonStyle
   seed: number
-  w: number // ellipse bounding-box width (px) — used for background placement
-  h: number // ellipse bounding-box height (px)
-}
-
-// Deterministic PRNG so the same line always wobbles the same way.
-function mulberry32(seed: number): () => number {
-  let s = seed >>> 0
-  return () => {
-    s = (s + 0x6d2b79f5) | 0
-    let t = Math.imul(s ^ (s >>> 15), 1 | s)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
+  w: number // bounding-box width (px) — used for background placement
+  h: number // bounding-box height (px)
 }
 
 function seedOf(text: string): number {
@@ -40,9 +29,9 @@ function seedOf(text: string): number {
 }
 
 function pickStyle(text: string): BalloonStyle {
-  if (/[！!]\s*$/.test(text) || /っ\s*[！!]/.test(text) || /[！!]{2,}/.test(text)) return 'spiky'
+  if (/[！!]\s*$/.test(text) || /っ\s*[！!]/.test(text) || /[！!]{2,}/.test(text)) return 'jagged'
   if (/[〜～♡♥❤]/.test(text) || /…\s*$/.test(text)) return 'cloud'
-  return 'oval'
+  return 'rounded'
 }
 
 // ---- vertical text ----
@@ -157,109 +146,169 @@ export function measureBubble(
   const maxColLen = Math.max(1, ...cols.map((c) => c.length))
   const blockW = cols.length * cellW
   const blockH = maxColLen * cellH
-  // Ellipse circumscribing the text block, with a minimum width so a single
-  // column doesn't become a sliver.
-  const a = Math.max((blockW / 2) * 1.5 + fontSize * 0.5, fontSize * 1.7)
-  const b = (blockH / 2) * 1.42 + fontSize * 0.5
+  const style = force ?? pickStyle(text)
+  // Circumscribe the text block, with a minimum width so a single column isn't a
+  // sliver. Jagged needs extra room so spikes' valleys clear the text.
+  const mult = style === 'jagged' ? 1.2 : 1
+  const a = Math.max((blockW / 2) * 1.5 + fontSize * 0.5, fontSize * 1.7) * mult
+  const b = ((blockH / 2) * 1.42 + fontSize * 0.5) * mult
   return {
     cols,
     fontSize,
     cellW,
     cellH,
-    style: force ?? pickStyle(text),
+    style,
     seed: seedOf(text),
     w: Math.ceil(a * 2),
     h: Math.ceil(b * 2)
   }
 }
 
-// ---- balloon outline ----
+// ---- balloon outlines (ported from the ../mangas manga app) ----
+// All paths are built in LOCAL coords (0..w, 0..h, center w/2,h/2); drawBubble
+// translates the context to the bubble origin first. `tip` (local) is the short
+// tail apex toward the speaker, or null for no tail.
 
-function angDiff(a: number, b: number): number {
-  let d = (a - b) % (Math.PI * 2)
-  if (d > Math.PI) d -= Math.PI * 2
-  if (d < -Math.PI) d += Math.PI * 2
-  return Math.abs(d)
+function prand(seed: number): number {
+  const s = Math.sin(seed * 1234.56 + 789.1) * 10000
+  return s - Math.floor(s)
 }
 
-function balloonOutline(
-  cx: number,
-  cy: number,
-  a: number,
-  b: number,
-  style: BalloonStyle,
-  seed: number,
-  tail: { x: number; y: number } | null
-): { x: number; y: number }[] {
-  const N = style === 'spiky' ? 48 : 72
-  const rnd = mulberry32(seed)
-  const radius = (t: number, i: number): number => {
-    let k = 1
-    if (style === 'cloud') k = 1 + 0.05 * Math.sin(t * 9)
-    else if (style === 'spiky') k = i % 2 === 0 ? 1.14 : 0.9
-    return k * (1 + (rnd() - 0.5) * 0.05)
-  }
-  const pt = (t: number, i: number): { x: number; y: number } => {
-    const k = radius(t, i)
-    return { x: cx + Math.cos(t) * a * k, y: cy + Math.sin(t) * b * k }
-  }
-
-  if (!tail) {
-    const out: { x: number; y: number }[] = []
-    for (let i = 0; i < N; i++) out.push(pt((i / N) * Math.PI * 2, i))
-    return out
-  }
-
-  const tt = Math.atan2((tail.y - cy) / b, (tail.x - cx) / a)
-  const dθ = 0.12 // narrower base (was 0.24)
-  const edgeX = cx + Math.cos(tt) * a
-  const edgeY = cy + Math.sin(tt) * b
-  const dirLen = Math.hypot(tail.x - edgeX, tail.y - edgeY) || 1
-  const tailLen = Math.min(dirLen * 0.35, Math.max(a, b) * 0.45) // ~half the length
-  const apex = {
-    x: edgeX + ((tail.x - edgeX) / dirLen) * tailLen,
-    y: edgeY + ((tail.y - edgeY) / dirLen) * tailLen
-  }
-
-  const out: { x: number; y: number }[] = []
-  let spliced = false
-  for (let i = 0; i < N; i++) {
-    const t = tt + Math.PI + (i / N) * Math.PI * 2
-    if (angDiff(t, tt) < dθ) {
-      if (!spliced) {
-        out.push(pt(tt - dθ, i))
-        out.push(apex)
-        out.push(pt(tt + dθ, i))
-        spliced = true
+// Rounded balloon with organic multi-frequency jitter and a flared, curved tail.
+function roundedPath(ctx: CanvasRenderingContext2D, w: number, h: number, tip: { x: number; y: number } | null): void {
+  const points = 72
+  const def = 1
+  const cx = w / 2
+  const cy = h / 2
+  const tx = tip ? tip.x - cx : 0
+  const ty = tip ? tip.y - cy : 0
+  const tailAngle = Math.atan2(ty, tx)
+  const angOffset = 0.1 // thin base
+  const sAng = (tailAngle - angOffset + Math.PI * 2) % (Math.PI * 2)
+  const eAng = (tailAngle + angOffset + Math.PI * 2) % (Math.PI * 2)
+  let tailInjected = false
+  ctx.beginPath()
+  for (let i = 0; i <= points; i++) {
+    const angle = (i / points) * Math.PI * 2
+    const inGap = sAng < eAng ? angle >= sAng && angle <= eAng : angle >= sAng || angle <= eAng
+    if (tip && inGap) {
+      if (!tailInjected) {
+        const tipX = cx + tx
+        const tipY = cy + ty
+        let ctrlX = cx + tx / 2
+        let ctrlY = cy + ty / 2
+        const getR = (a: number): number => 0.5 - 0.08 * def + Math.sin(a * 3) * 0.02 * def
+        const xL = cx + Math.cos(sAng) * w * getR(sAng)
+        const yL = cy + Math.sin(sAng) * h * getR(sAng)
+        const xR = cx + Math.cos(eAng) * w * getR(eAng)
+        const yR = cy + Math.sin(eAng) * h * getR(eAng)
+        const midX = (xL + xR) / 2
+        const midY = (yL + yR) / 2
+        const nlen = Math.hypot(tipX - midX, tipY - midY) || 1
+        const nx = (tipX - midX) / nlen
+        const ny = (tipY - midY) / nlen
+        if ((ctrlX - midX) * nx + (ctrlY - midY) * ny < 0) {
+          ctrlX = midX + nx * 5
+          ctrlY = midY + ny * 5
+        }
+        const flareF = Math.min(w, h) * 0.04
+        const sXL = xL + (ctrlX - xL) * 0.4 - Math.sin(sAng) * flareF * (tx > 0 ? 1 : -1)
+        const sYL = yL + (ctrlY - yL) * 0.4 + Math.cos(sAng) * flareF * (ty > 0 ? 1 : -1)
+        const sXR = xR + (ctrlX - xR) * 0.4 + Math.sin(eAng) * flareF * (tx > 0 ? -1 : 1)
+        const sYR = yR + (ctrlY - yR) * 0.4 - Math.cos(eAng) * flareF * (ty > 0 ? -1 : 1)
+        ctx.lineTo(xL, yL)
+        ctx.quadraticCurveTo(sXL, sYL, tipX, tipY)
+        ctx.quadraticCurveTo(sXR, sYR, xR, yR)
+        tailInjected = true
       }
       continue
     }
-    out.push(pt(t, i))
+    const jitter = (Math.sin(angle * 3) * 0.02 + Math.sin(angle * 7) * 0.01 + Math.cos(angle * 5) * 0.015) * def
+    const r = 0.5 - 0.08 * def + jitter
+    const x = cx + Math.cos(angle) * w * r
+    const y = cy + Math.sin(angle) * h * r
+    if (i === 0) ctx.moveTo(x, y)
+    else ctx.lineTo(x, y)
   }
-  return out
+  ctx.closePath()
 }
 
-// Thought-balloon tail: shrinking puffs trailing toward the thinker.
+// Jagged (ギザギザ) balloon: outward spikes with rounded valleys.
+function jaggedPath(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  tip: { x: number; y: number } | null,
+  seed: number
+): void {
+  const spikeCount = 36
+  const def = 1
+  const cx = w / 2
+  const cy = h / 2
+  const tx = tip ? tip.x - cx : 0
+  const ty = tip ? tip.y - cy : 0
+  const tailAngle = Math.atan2(ty, tx)
+  const angOffset = 0.12
+  const sAng = (tailAngle - angOffset + Math.PI * 2) % (Math.PI * 2)
+  const eAng = (tailAngle + angOffset + Math.PI * 2) % (Math.PI * 2)
+  let tailInjected = false
+  const step = (Math.PI * 2) / spikeCount
+  const peak = (i: number): { x: number; y: number; angle: number } => {
+    const angle = i * step
+    const rOuter = 0.5 + (0.05 + prand(i * 123.456 + seed) * 0.2) * def
+    return { x: cx + Math.cos(angle) * w * rOuter, y: cy + Math.sin(angle) * h * rOuter, angle }
+  }
+  ctx.beginPath()
+  let firstMove = true
+  for (let i = 0; i < spikeCount; i++) {
+    const p1 = peak(i)
+    const p2 = peak(i + 1)
+    const normAngle = p1.angle % (Math.PI * 2)
+    const inGap = sAng < eAng ? normAngle >= sAng && normAngle <= eAng : normAngle >= sAng || normAngle <= eAng
+    if (tip && inGap) {
+      if (!tailInjected) {
+        const tipX = cx + tx
+        const tipY = cy + ty
+        const rBase = 0.42
+        const xL = cx + Math.cos(sAng) * w * rBase
+        const yL = cy + Math.sin(sAng) * h * rBase
+        const xR = cx + Math.cos(eAng) * w * rBase
+        const yR = cy + Math.sin(eAng) * h * rBase
+        const ctrlX = cx + tx / 2
+        const ctrlY = cy + ty / 2
+        ctx.lineTo(xL, yL)
+        ctx.quadraticCurveTo(xL + (ctrlX - xL) * 0.4, yL + (ctrlY - yL) * 0.4, tipX, tipY)
+        ctx.quadraticCurveTo(xR + (ctrlX - xR) * 0.4, yR + (ctrlY - yR) * 0.4, xR, yR)
+        tailInjected = true
+      }
+      continue
+    }
+    if (firstMove) {
+      ctx.moveTo(p1.x, p1.y)
+      firstMove = false
+    }
+    const midAngle = p1.angle + step / 2
+    const rInner = 0.42 - 0.06 * def // rounded valley, kept text-safe
+    ctx.quadraticCurveTo(cx + Math.cos(midAngle) * w * rInner, cy + Math.sin(midAngle) * h * rInner, p2.x, p2.y)
+  }
+  ctx.closePath()
+}
+
+// Thought-balloon tail: shrinking puffs trailing toward the thinker (local coords).
 function drawThoughtTail(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
-  a: number,
-  b: number,
-  target: { x: number; y: number },
+  ux: number,
+  uy: number,
+  startDist: number,
   fontSize: number
 ): void {
-  const tt = Math.atan2((target.y - cy) / b, (target.x - cx) / a)
-  const edgeX = cx + Math.cos(tt) * a
-  const edgeY = cy + Math.sin(tt) * b
-  const dist = Math.hypot(target.x - edgeX, target.y - edgeY) || 1
-  const ux = (target.x - edgeX) / dist
-  const uy = (target.y - edgeY) / dist
   for (let i = 0; i < 3; i++) {
-    const f = (i + 1) / 4
     const r = fontSize * (0.5 - i * 0.13)
-    const px = edgeX + ux * dist * f * 0.75
-    const py = edgeY + uy * dist * f * 0.75
+    const d = startDist + i * fontSize * 0.85
+    const px = cx + ux * d
+    const py = cy + uy * d
     ctx.save()
     ctx.shadowColor = 'rgba(0,0,0,0.3)'
     ctx.shadowBlur = Math.round(fontSize * 0.3)
@@ -274,7 +323,7 @@ function drawThoughtTail(
   }
 }
 
-// Draw the balloon at (x,y) with a tail pointing toward the speaker's mouth.
+// Draw the balloon at (x,y) with a (short) tail pointing toward the speaker's mouth.
 export function drawBubble(
   ctx: CanvasRenderingContext2D,
   layout: BubbleLayout,
@@ -282,25 +331,37 @@ export function drawBubble(
   y: number,
   tailTarget: { x: number; y: number }
 ): void {
-  const { w, h, fontSize } = layout
-  const cx = x + w / 2
-  const cy = y + h / 2
-  const thought = layout.style === 'cloud'
-  if (thought) drawThoughtTail(ctx, cx, cy, w / 2, h / 2, tailTarget, fontSize)
-  const pts = balloonOutline(cx, cy, w / 2, h / 2, layout.style, layout.seed, thought ? null : tailTarget)
+  const { w, h, fontSize, style, seed } = layout
+  const cx = w / 2
+  const cy = h / 2
+  const a = w / 2
+  const b = h / 2
+  const dx = tailTarget.x - (x + cx)
+  const dy = tailTarget.y - (y + cy)
+  const dl = Math.hypot(dx, dy) || 1
+  const ux = dx / dl
+  const uy = dy / dl
+  // Distance from center to the ellipse edge in the mouth direction.
+  const rEdge = (a * b) / (Math.sqrt((b * ux) ** 2 + (a * uy) ** 2) || 1)
+  const visLen = Math.max(fontSize * 0.7, Math.min(dl - rEdge, fontSize * 1.6)) // short tail
+  const thought = style === 'cloud'
+  const tip = thought ? null : { x: cx + ux * (rEdge + visLen), y: cy + uy * (rEdge + visLen) }
 
-  const path = (): void => {
-    ctx.beginPath()
-    ctx.moveTo(pts[0].x, pts[0].y)
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
-    ctx.closePath()
+  ctx.save()
+  ctx.translate(x, y)
+
+  if (thought) drawThoughtTail(ctx, cx, cy, ux, uy, rEdge + fontSize * 0.5, fontSize)
+
+  const build = (): void => {
+    if (style === 'jagged') jaggedPath(ctx, w, h, tip, seed)
+    else roundedPath(ctx, w, h, tip)
   }
 
   ctx.save()
   ctx.shadowColor = 'rgba(0,0,0,0.35)'
   ctx.shadowBlur = Math.round(fontSize * 0.45)
   ctx.shadowOffsetY = Math.round(fontSize * 0.12)
-  path()
+  build()
   ctx.fillStyle = 'rgba(255,255,255,0.97)'
   ctx.fill()
   ctx.restore()
@@ -308,10 +369,11 @@ export function drawBubble(
   ctx.lineWidth = Math.max(2, fontSize * 0.09)
   ctx.strokeStyle = '#1b1b1b'
   ctx.lineJoin = 'round'
-  path()
+  build()
   ctx.stroke()
 
   drawColumns(ctx, layout, cx, cy, '#161616')
+  ctx.restore()
 }
 
 // ---- fallback caption band (horizontal subtitle) ----

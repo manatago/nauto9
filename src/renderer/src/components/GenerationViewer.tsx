@@ -44,8 +44,8 @@ export default function GenerationViewer({
   // Brush-size preview ring that follows the cursor over the inpaint mask, so the
   // covered area is visible before painting. Screen px (fixed-positioned).
   const [cursor, setCursor] = useState<{ x: number; y: number; d: number } | null>(null)
-  // Dialogue-bubble shape: auto (by line content) or forced 通常/叫び/心の中.
-  const [bubbleStyle, setBubbleStyle] = useState<'auto' | 'oval' | 'spiky' | 'cloud'>('auto')
+  // Dialogue-bubble shape: auto (by line content) or forced 通常/ギザギザ/心の中.
+  const [bubbleStyle, setBubbleStyle] = useState<'auto' | 'rounded' | 'jagged' | 'cloud'>('auto')
   const [busy, setBusy] = useState(false)
   // Previous image data, kept only right after a regenerate (1-step undo).
   // Cleared on navigation / close.
@@ -563,8 +563,8 @@ export default function GenerationViewer({
             className="shrink-0 rounded-md border border-ink-600 bg-ink-900 px-2 py-1.5 text-sm text-ink-200"
           >
             <option value="auto">自動</option>
-            <option value="oval">通常</option>
-            <option value="spiky">叫び</option>
+            <option value="rounded">通常</option>
+            <option value="jagged">ギザギザ</option>
             <option value="cloud">心の中</option>
           </select>
           <button
