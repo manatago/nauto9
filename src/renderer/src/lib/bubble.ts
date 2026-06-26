@@ -10,6 +10,9 @@
 // Handwriting font (declared in index.css); falls back to system JP fonts.
 const FONT = (px: number): string => `${px}px "KleeOne", "Hiragino Sans", "Noto Sans JP", sans-serif`
 
+// Balloon opacity — lets the image show through behind the bubble.
+const BUBBLE_ALPHA = 0.7
+
 // Ensure the bundled handwriting font is loaded before measuring/drawing on the
 // canvas (canvas silently falls back if the face isn't ready yet).
 export async function ensureBubbleFont(): Promise<void> {
@@ -352,35 +355,43 @@ export function drawBubble(
   const tip =
     thought || visLen < 2 ? null : { x: cx + ux * (rEdge + visLen), y: cy + uy * (rEdge + visLen) }
 
-  ctx.save()
-  ctx.translate(x, y)
-
-  if (thought) drawThoughtTail(ctx, cx, cy, ux, uy, rEdge + fontSize * 0.4, fontSize)
+  // Render the balloon OPAQUE on an offscreen canvas first (so the stroke-then-fill
+  // trick still hides every internal line), then composite it at BUBBLE_ALPHA so
+  // the image shows through without those internal lines bleeding. Text is drawn
+  // on the main canvas at full opacity for readability.
+  const off = document.createElement('canvas')
+  off.width = ctx.canvas.width
+  off.height = ctx.canvas.height
+  const octx = off.getContext('2d')
+  if (!octx) return
+  octx.translate(x, y)
+  if (thought) drawThoughtTail(octx, cx, cy, ux, uy, rEdge + fontSize * 0.4, fontSize)
 
   // Body + tail as two subpaths in one path → fill (nonzero) = their union.
-  const build = (): void => {
-    if (style === 'jagged') jaggedBody(ctx, w, h, seed)
-    else roundedBody(ctx, w, h)
-    if (tip) addTail(ctx, w, h, tip)
-  }
+  if (style === 'jagged') jaggedBody(octx, w, h, seed)
+  else roundedBody(octx, w, h)
+  if (tip) addTail(octx, w, h, tip)
 
   const line = Math.max(1.5, fontSize * 0.06)
-  build()
-  // Stroke FIRST at double width (with the drop shadow), then paint the opaque
-  // white fill on top — the fill covers every stroke segment inside the union, so
-  // only the clean OUTER contour of (body ∪ tail) remains. No self-intersection.
-  ctx.save()
-  ctx.shadowColor = 'rgba(0,0,0,0.35)'
-  ctx.shadowBlur = Math.round(fontSize * 0.45)
-  ctx.shadowOffsetY = Math.round(fontSize * 0.12)
-  ctx.lineWidth = line * 2
-  ctx.strokeStyle = '#1b1b1b'
-  ctx.lineJoin = 'round'
-  ctx.stroke()
-  ctx.restore()
-  ctx.fillStyle = '#ffffff'
-  ctx.fill()
+  octx.save()
+  octx.shadowColor = 'rgba(0,0,0,0.35)'
+  octx.shadowBlur = Math.round(fontSize * 0.45)
+  octx.shadowOffsetY = Math.round(fontSize * 0.12)
+  octx.lineWidth = line * 2
+  octx.strokeStyle = '#1b1b1b'
+  octx.lineJoin = 'round'
+  octx.stroke()
+  octx.restore()
+  octx.fillStyle = '#ffffff'
+  octx.fill()
 
+  ctx.save()
+  ctx.globalAlpha = BUBBLE_ALPHA
+  ctx.drawImage(off, 0, 0)
+  ctx.restore()
+
+  ctx.save()
+  ctx.translate(x, y)
   drawColumns(ctx, layout, cx, cy, '#161616')
   ctx.restore()
 }
