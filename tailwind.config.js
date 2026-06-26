@@ -3,22 +3,27 @@ export default {
   content: ['./src/renderer/index.html', './src/renderer/src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      // Colors are driven by CSS variables (RGB channel triplets) in index.css so
+      // the `.theme-light` class can remap the whole palette. The `<alpha-value>`
+      // placeholder keeps `ink-900/40` opacity modifiers working. The scale is
+      // SEMANTIC (900 = base background … 50 = brightest text); the light theme
+      // inverts that meaning, so component classes never change.
       colors: {
         ink: {
-          50: '#f5f7fb',
-          100: '#e6eaf2',
-          200: '#d0d7e3',
-          300: '#b9c1d1',
-          400: '#9aa3b8', // secondary text — clearly readable on dark
-          500: '#80899e', // dim/hint text — was #36405c (nearly invisible)
-          600: '#252d42', // borders / dividers (kept dark on purpose)
-          700: '#1a2030',
-          800: '#11151f',
-          900: '#0b0e14'
+          50: 'rgb(var(--ink-50) / <alpha-value>)',
+          100: 'rgb(var(--ink-100) / <alpha-value>)',
+          200: 'rgb(var(--ink-200) / <alpha-value>)',
+          300: 'rgb(var(--ink-300) / <alpha-value>)',
+          400: 'rgb(var(--ink-400) / <alpha-value>)',
+          500: 'rgb(var(--ink-500) / <alpha-value>)',
+          600: 'rgb(var(--ink-600) / <alpha-value>)',
+          700: 'rgb(var(--ink-700) / <alpha-value>)',
+          800: 'rgb(var(--ink-800) / <alpha-value>)',
+          900: 'rgb(var(--ink-900) / <alpha-value>)'
         },
         accent: {
-          DEFAULT: '#5eead4',
-          soft: '#2dd4bf'
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          soft: 'rgb(var(--accent-soft) / <alpha-value>)'
         }
       }
     }

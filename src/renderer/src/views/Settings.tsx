@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, Download, Plus, Trash2, Upload } from 'lucide-react'
+import { Check, ChevronDown, Download, Moon, Plus, Sun, Trash2, Upload } from 'lucide-react'
 import { api } from '../api'
 import { useToast } from '../components/Toast'
+import { getTheme, setTheme, type Theme } from '../lib/theme'
 
 const TOKEN_KEY = 'NOVELAI_API_TOKEN'
 
@@ -388,6 +389,31 @@ function AdSettings(): JSX.Element {
   )
 }
 
+function ThemeSettings(): JSX.Element {
+  const [theme, setThemeState] = useState<Theme>(getTheme())
+  const choose = (t: Theme): void => {
+    setTheme(t)
+    setThemeState(t)
+  }
+  const seg = (active: boolean): string =>
+    `flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm ${
+      active ? 'bg-ink-700 text-ink-100' : 'text-ink-400 hover:text-ink-100'
+    }`
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-ink-500">画面全体の配色を切り替えます。すぐに反映されます。</p>
+      <div className="inline-flex gap-1 rounded-lg border border-ink-700 bg-ink-800/50 p-1">
+        <button onClick={() => choose('dark')} className={seg(theme === 'dark')}>
+          <Moon size={14} /> ダーク
+        </button>
+        <button onClick={() => choose('light')} className={seg(theme === 'light')}>
+          <Sun size={14} /> ライト
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function BackupSettings(): JSX.Element {
   const toast = useToast()
   const [busy, setBusy] = useState<'export' | 'import' | null>(null)
@@ -533,6 +559,9 @@ export default function Settings(): JSX.Element {
         </div>
       </SettingsCard>
 
+      <SettingsCard title="テーマ（表示の配色）">
+        <ThemeSettings />
+      </SettingsCard>
       <SettingsCard title="参照画像の生成への反映">
         <ReferenceSettings />
       </SettingsCard>

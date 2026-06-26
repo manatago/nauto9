@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
+import { applyTheme, getTheme } from './lib/theme'
+
+// Apply the saved theme before first paint to avoid a flash of the wrong colors.
+applyTheme(getTheme())
 
 // Surface otherwise-silent failures (these are what turn into a black screen).
 window.addEventListener('error', (e) => {
