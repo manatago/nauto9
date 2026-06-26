@@ -23,16 +23,16 @@
 
 :root.theme-light {
   color-scheme: light;
-  --ink-900: 255 255 255; /* page background */
-  --ink-800: 241 244 248; /* elevated panels / cards */
-  --ink-700: 228 233 239; /* hover, active tab, chips */
-  --ink-600: 207 213 223; /* borders / dividers */
-  --ink-500: 107 114 132; /* dim / hint text */
-  --ink-400: 86 95 113; /* secondary text */
-  --ink-300: 67 75 92;
-  --ink-200: 49 57 73; /* secondary-strong text */
-  --ink-100: 27 33 46; /* body text */
-  --ink-50: 15 19 28; /* headings (darkest) */
+  --ink-900: 228 231 236; /* page background — soft light gray, not glaring white */
+  --ink-800: 237 240 244; /* elevated panels / cards (a touch brighter than bg) */
+  --ink-700: 214 220 228; /* hover, active tab, chips */
+  --ink-600: 193 200 211; /* borders / dividers */
+  --ink-500: 104 111 129; /* dim / hint text */
+  --ink-400: 84 92 110; /* secondary text */
+  --ink-300: 66 74 91;
+  --ink-200: 48 56 72; /* secondary-strong text */
+  --ink-100: 26 32 45; /* body text */
+  --ink-50: 14 18 27; /* headings (darkest) */
   --accent: 13 148 136; /* teal-600 — readable on light */
   --accent-soft: 15 118 110; /* teal-700 */
 }
