@@ -211,11 +211,11 @@ function balloonOutline(
   }
 
   const tt = Math.atan2((tail.y - cy) / b, (tail.x - cx) / a)
-  const dθ = 0.24
+  const dθ = 0.12 // narrower base (was 0.24)
   const edgeX = cx + Math.cos(tt) * a
   const edgeY = cy + Math.sin(tt) * b
   const dirLen = Math.hypot(tail.x - edgeX, tail.y - edgeY) || 1
-  const tailLen = Math.min(dirLen * 0.7, Math.max(a, b) * 0.95)
+  const tailLen = Math.min(dirLen * 0.35, Math.max(a, b) * 0.45) // ~half the length
   const apex = {
     x: edgeX + ((tail.x - edgeX) / dirLen) * tailLen,
     y: edgeY + ((tail.y - edgeY) / dirLen) * tailLen
