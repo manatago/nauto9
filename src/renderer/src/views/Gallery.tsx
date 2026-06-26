@@ -130,7 +130,7 @@ export default function Gallery(): JSX.Element {
   }
 
   async function remove(b: Batch): Promise<void> {
-    if (!confirm(`バッチ「${b.name}」と生成画像を削除しますか？`)) return
+    if (!confirm(`バッチ「${b.name}」と生成画像・対応する記事を削除しますか？`)) return
     await api.batches.delete(b.id)
     if (viewer?.batchId === b.id) setViewer(null)
     mutate()

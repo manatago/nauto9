@@ -178,6 +178,9 @@ export function deleteBatch(id: number): void {
   const imgs = db
     .prepare('SELECT image_path FROM generations WHERE batch_id = ? AND image_path IS NOT NULL')
     .all(id) as { image_path: string }[]
+  // Articles reference the batch with ON DELETE SET NULL, so delete them
+  // explicitly (while batch_id still matches) to keep them in sync with the batch.
+  db.prepare('DELETE FROM articles WHERE batch_id = ?').run(id)
   db.prepare('DELETE FROM batches WHERE id = ?').run(id)
   for (const { image_path } of imgs) deleteImage(image_path)
 }
