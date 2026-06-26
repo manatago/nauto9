@@ -51,23 +51,40 @@ function pickStyle(text: string): BalloonStyle {
 // Heuristic, not a full morphological analyzer: break opportunities sit after
 // punctuation and after common particles, never before clinging characters
 // (small kana, 、。, long vowel, closing brackets).
-const BREAK_PUNCT = /[、。，．！？!?…〜]/
+const BREAK_PUNCT = /[、。，．！？!?…‥〜]/
 const BREAK_PARTICLE = /[はがをにへとでもやのかねよわぞさ]/
 // Always start a new column after these (unless the next char clings).
-const FORCE_BREAK = /[、。！？!?]/
-const NO_BREAK_BEFORE = /[、。，．！？!?…ー―々ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョ）」』】〕｝)\]]/
+const FORCE_BREAK = /[、。！？!?…‥]/
+// Characters that cling to the preceding one (never break before them): closing
+// punctuation, small kana, long vowel, hearts, 〜 …
+const NO_BREAK_BEFORE =
+  /[、。，．！？!?…‥ー―々ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョ）」』】〕｝)\]♡♥❤〜～]/
+// Multi-char particles/suffixes that end a 文節 — break AFTER them.
+const MULTI_PARTICLES = [
+  'けれど', 'ばかり', 'くらい', 'ぐらい', 'ながら', 'だけ', 'まで', 'ほど', 'など', 'から',
+  'ので', 'のに', 'けど', 'ても', 'でも', 'とか', 'なら', 'より', 'って', 'では', 'には', 'とは',
+  'こそ', 'さえ', 'しか'
+]
+// 2-char heads of the above, so a single particle that merely STARTS a multi
+// particle (か in から, で in では…) doesn't break the word.
+const MULTI_HEAD = new Set(MULTI_PARTICLES.map((p) => p.slice(0, 2)))
 
 function canBreakAfter(chars: string[], i: number): boolean {
   const nx = chars[i + 1]
   if (nx === undefined || NO_BREAK_BEFORE.test(nx)) return false
-  return BREAK_PUNCT.test(chars[i]) || BREAK_PARTICLE.test(chars[i])
+  if (BREAK_PUNCT.test(chars[i])) return true
+  for (const p of MULTI_PARTICLES) {
+    if (i + 1 >= p.length && chars.slice(i - p.length + 1, i + 1).join('') === p) return true
+  }
+  if (BREAK_PARTICLE.test(chars[i]) && !MULTI_HEAD.has(chars[i] + (chars[i + 1] ?? ''))) return true
+  return false
 }
 
 // Break priority: (1) always start a new column after 感嘆符/句読点, then
 // (2) wrap each resulting segment at 文節 boundaries, BALANCED so columns are
-// roughly even (avoid one over-long column) — never past hardCap. cols[0] is the
-// rightmost column. Manual newlines split columns too.
-function splitColumns(text: string, softCap: number, hardCap: number): string[][] {
+// roughly even (avoid one over-long column) — never splitting a word. cols[0] is
+// the rightmost column. Manual newlines split columns too.
+export function splitColumns(text: string, softCap: number, hardCap: number): string[][] {
   const out: string[][] = []
   for (const para of text.split(/\r?\n/)) {
     const chars = [...para]
@@ -96,21 +113,25 @@ function balancedWrap(chars: string[], softCap: number, hardCap: number): string
   const target = Math.ceil(L / numCols)
   const cols: string[][] = []
   let col: string[] = []
-  let lastBreak = 0
+  let lastBreak = 0 // length at the last 文節 opportunity in the current column
   for (let i = 0; i < L; i++) {
     col.push(chars[i])
     const can = canBreakAfter(chars, i)
-    if (col.length >= hardCap) {
-      const cut = lastBreak > 0 && lastBreak < col.length ? lastBreak : col.length
-      cols.push(col.slice(0, cut))
-      col = col.slice(cut)
-      lastBreak = 0
-    } else if (col.length >= target && can) {
-      cols.push(col)
-      col = []
-      lastBreak = 0
-    } else if (can) {
+    if (can) {
+      if (col.length >= target) {
+        cols.push(col)
+        col = []
+        lastBreak = 0
+        continue
+      }
       lastBreak = col.length
+    }
+    // Over the cap: cut back to the last 文節 point. If there's none, KEEP GOING
+    // rather than splitting a word (the user can newline manually).
+    if (col.length >= hardCap && lastBreak > 0) {
+      cols.push(col.slice(0, lastBreak))
+      col = col.slice(lastBreak)
+      lastBreak = 0
     }
   }
   if (col.length) cols.push(col)
@@ -134,7 +155,7 @@ function drawVChar(
   ctx.save()
   ctx.translate(x, y)
   if (V_ROTATE.test(ch)) ctx.rotate(Math.PI / 2)
-  else if (V_TOPRIGHT.test(ch)) ctx.translate(fs * 0.42, -fs * 0.32) // 、。 to upper-right
+  else if (V_TOPRIGHT.test(ch)) ctx.translate(fs * 0.5, -fs * 0.34) // 、。 to upper-right
   if (stroke) {
     ctx.lineWidth = stroke.width
     ctx.strokeStyle = stroke.color
