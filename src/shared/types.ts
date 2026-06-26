@@ -145,11 +145,12 @@ export interface BatchCreateInput {
   prefix_prompt?: string
 }
 
-// "scene" batch: selected situations × every character carrying a tag.
+// "scene" batch: selected situations × an explicit set of characters (picked
+// manually and/or bulk-selected by tag in the UI).
 export interface SceneBatchCreateInput {
   story_id: number
   situation_ids: number[]
-  character_tag_id: number
+  character_ids: number[]
   name?: string
   prefix_prompt?: string
 }

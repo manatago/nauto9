@@ -10,7 +10,6 @@ import type {
 import { getDb } from './index'
 import { now, mediaUrlOrNull, thumbUrlOrNull, type Row } from './util'
 import { listSituationsByStory } from './situations'
-import { charactersByTag } from './repo'
 import { deleteImage } from '../services/images'
 
 function toGeneration(r: Row): Generation {
@@ -123,34 +122,43 @@ export function createBatch(input: BatchCreateInput): Batch {
   return getBatch(tx())!
 }
 
-// "scene" batch: selected situations × every character carrying the tag, one
-// image each (situation-major order).
+// "scene" batch: selected situations × an explicit list of characters, one image
+// each (situation-major order).
 export function createSceneBatch(input: SceneBatchCreateInput): Batch {
   const db = getDb()
   const st = db.prepare('SELECT id, name FROM stories WHERE id = ?').get(input.story_id) as
     | { id: number; name: string }
     | undefined
   if (!st) throw new Error('ストーリーが見つかりません')
-  const tag = db.prepare('SELECT id, name FROM tags WHERE id = ?').get(input.character_tag_id) as
-    | { id: number; name: string }
-    | undefined
-  if (!tag) throw new Error('キャラクタータグが見つかりません')
 
   const wanted = new Set(input.situation_ids)
   const sits = listSituationsByStory(input.story_id).filter((s) => wanted.has(s.id))
   if (sits.length === 0) throw new Error('シチュエーションが選択されていません')
-  const chars = charactersByTag(tag.id)
-  if (chars.length === 0) throw new Error('このタグに属するキャラクターがいません')
 
-  const name = (input.name?.trim() || `[${tag.name}]-${st.name}`).slice(0, 200)
+  // Resolve the picked characters, preserving the selection order.
+  const ids = [...new Set(input.character_ids)]
+  const placeholders = ids.map(() => '?').join(',')
+  const found = (
+    ids.length
+      ? (db.prepare(`SELECT id, name FROM characters WHERE id IN (${placeholders})`).all(...ids) as {
+          id: number
+          name: string
+        }[])
+      : []
+  )
+  const byId = new Map(found.map((c) => [c.id, c]))
+  const chars = ids.map((id) => byId.get(id)).filter((c): c is { id: number; name: string } => !!c)
+  if (chars.length === 0) throw new Error('キャラクターが選択されていません')
+
+  const name = (input.name?.trim() || `${st.name} × ${chars.length}キャラ`).slice(0, 200)
 
   const tx = db.transaction(() => {
     const batchId = db
       .prepare(
-        `INSERT INTO batches (name, type, story_id, character_tag_id, story_name, character_tag_name, prefix_prompt, status, total)
-         VALUES (?, 'scene', ?, ?, ?, ?, ?, 'pending', ?)`
+        `INSERT INTO batches (name, type, story_id, story_name, prefix_prompt, status, total)
+         VALUES (?, 'scene', ?, ?, ?, 'pending', ?)`
       )
-      .run(name, st.id, tag.id, st.name, tag.name, input.prefix_prompt?.trim() ?? '', sits.length * chars.length)
+      .run(name, st.id, st.name, input.prefix_prompt?.trim() ?? '', sits.length * chars.length)
       .lastInsertRowid as number
     const ins = db.prepare(
       `INSERT INTO generations (batch_id, situation_id, character_id, seq, situation_name, character_name)

@@ -6,9 +6,10 @@ import type { Article, ArticleBlock, ArticleRegenInput } from '@shared/types'
 import * as batches from '../db/batches'
 import * as sit from '../db/situations'
 import * as repo from '../db/repo'
+import type { Batch } from '@shared/types'
 import { generateText } from './llm'
 import { replaceXxx } from './prompt'
-import { parseSceneTransition } from './article-format'
+import { mergeDialogueSamples, parseSceneTransition } from './article-format'
 
 // Ad-link HTML snippets (stored as a JSON array of strings in settings) inserted
 // before the 2nd and later <h2>. Returns [] if unset/invalid.
@@ -24,6 +25,25 @@ function adSnippets(): string[] {
 function storyDescription(storyId: number | null): string {
   if (!storyId) return ''
   return sit.listStories().find((s) => s.id === storyId)?.description ?? ''
+}
+
+// Feed each success image's generated dialogue back into its situation's セリフ例
+// (dialogue_samples) so future dialogue generation has more few-shot examples.
+// Exact-line dedup, no LLM. Called when an article is composed.
+function saveDialogueSamplesFromBatch(batch: Batch): void {
+  const bySituation = new Map<number, string[]>()
+  for (const g of batch.generations) {
+    if (g.status !== 'success' || !g.situation_id || !g.dialogue.trim()) continue
+    const arr = bySituation.get(g.situation_id) ?? []
+    arr.push(g.dialogue.trim())
+    bySituation.set(g.situation_id, arr)
+  }
+  for (const [situationId, lines] of bySituation) {
+    const s = sit.getSituation(situationId)
+    if (!s) continue
+    const merged = mergeDialogueSamples(s.dialogue_samples, lines)
+    if (merged !== s.dialogue_samples) sit.updateSituation(situationId, { dialogue_samples: merged })
+  }
 }
 
 function firstJson(s: string): { title?: string; intro?: string } | null {
@@ -172,6 +192,9 @@ export async function composeArticle(batchId: number): Promise<Article> {
       situation_id: null
     })
   }
+
+  // Persist this batch's dialogues as セリフ例 for the situations (for next time).
+  saveDialogueSamplesFromBatch(batch)
 
   return { batch_id: batchId, title, intro, h3_mode: 'dialogue', blocks }
 }

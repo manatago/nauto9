@@ -1,6 +1,30 @@
 import { describe, it, expect } from 'vitest'
-import { parseSceneTransition, buildArticleHtml } from '../src/main/services/article-format'
+import {
+  parseSceneTransition,
+  buildArticleHtml,
+  mergeDialogueSamples
+} from '../src/main/services/article-format'
 import type { ArticleBlock } from '@shared/types'
+
+describe('mergeDialogueSamples', () => {
+  it('appends new lines after existing content', () => {
+    expect(mergeDialogueSamples('既存のメモ', ['新しいセリフ'])).toBe('既存のメモ\n新しいセリフ')
+  })
+  it('skips lines already present (exact match, trimmed)', () => {
+    expect(mergeDialogueSamples('やめて…\n場面転換', ['  やめて…  ', '気持ちいい'])).toBe(
+      'やめて…\n場面転換\n気持ちいい'
+    )
+  })
+  it('dedups within the new lines too', () => {
+    expect(mergeDialogueSamples('', ['同じ', '同じ', '別'])).toBe('同じ\n別')
+  })
+  it('returns the original unchanged when nothing is new', () => {
+    expect(mergeDialogueSamples('a\nb', ['a', ' b '])).toBe('a\nb')
+  })
+  it('ignores blank candidate lines', () => {
+    expect(mergeDialogueSamples('x', ['', '   '])).toBe('x')
+  })
+})
 
 describe('parseSceneTransition', () => {
   it('extracts a full-width parenthesised title', () => {

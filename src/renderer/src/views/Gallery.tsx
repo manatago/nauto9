@@ -181,9 +181,14 @@ export default function Gallery(): JSX.Element {
                 {STATUS_LABEL[b.status]} {b.done_count}/{b.total}
               </span>
             )
+            const sceneChars =
+              b.type === 'scene'
+                ? b.character_tag_name ||
+                  `${new Set(b.generations.map((g) => g.character_name).filter(Boolean)).size}キャラ`
+                : ''
             const meta =
               (b.type === 'scene'
-                ? `[${b.character_tag_name || '?'}] × ${b.story_name || '?'}`
+                ? `${sceneChars} × ${b.story_name || '?'}`
                 : `${b.character_name || '?'} × ${b.story_name || '?'}`) +
               (success.length > 0 ? ` ・ ${success.length}枚` : '')
             return (

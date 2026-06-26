@@ -10,6 +10,29 @@ export function parseSceneTransition(memo: string): { isBreak: boolean; title: s
   return { isBreak: true, title: m && m[1].trim() ? m[1].trim() : null }
 }
 
+// Append dialogue lines to a situation's existing セリフ例 (dialogue_samples),
+// skipping any that are already present as an exact line (trimmed). No LLM — a
+// near-duplicate is fine to add; only literal duplicates are filtered. Returns
+// the existing text unchanged when there is nothing new.
+export function mergeDialogueSamples(existing: string, newLines: string[]): string {
+  const seen = new Set(
+    existing
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+  )
+  const additions: string[] = []
+  for (const raw of newLines) {
+    const line = raw.trim()
+    if (!line || seen.has(line)) continue
+    seen.add(line)
+    additions.push(line)
+  }
+  if (additions.length === 0) return existing
+  const base = existing.replace(/\s+$/, '')
+  return base ? `${base}\n${additions.join('\n')}` : additions.join('\n')
+}
+
 export function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')

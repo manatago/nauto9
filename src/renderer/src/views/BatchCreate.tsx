@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, Play, Wand2 } from 'lucide-react'
 import { api, useBatches, useCharacters, useSituations, useStories, useTags } from '../api'
 import { useToast } from '../components/Toast'
 import CharacterCardGrid from '../components/CharacterCardGrid'
+import CharacterMultiGrid from '../components/CharacterMultiGrid'
 import StoryCardGrid from '../components/StoryCardGrid'
 
 type Mode = 'story' | 'scene'
@@ -21,7 +22,7 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
   const [mode, setMode] = useState<Mode>('story')
   const [characterId, setCharacterId] = useState<number | null>(null)
   const [storyId, setStoryId] = useState<number | null>(null)
-  const [tagId, setTagId] = useState<number | null>(null)
+  const [selectedChars, setSelectedChars] = useState<number[]>([])
   const [selectedSits, setSelectedSits] = useState<number[]>([])
   const [name, setName] = useState('')
   const [prefix, setPrefix] = useState('')
@@ -30,18 +31,12 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
   const { data: situations } = useSituations(mode === 'scene' ? storyId : null)
   const story = stories?.find((s) => s.id === storyId)
 
-  // characters carrying the chosen tag (for the count + preview)
-  const tagChars = useMemo(
-    () => (tagId == null ? [] : (characters ?? []).filter((c) => c.tags.some((t) => t.id === tagId))),
-    [characters, tagId]
-  )
-
   // reset situation selection when the story changes
   useEffect(() => setSelectedSits([]), [storyId])
 
   const storyCanStart = characterId != null && storyId != null && (story?.situation_count ?? 0) > 0
-  const sceneCount = selectedSits.length * tagChars.length
-  const sceneCanStart = storyId != null && selectedSits.length > 0 && tagId != null && tagChars.length > 0
+  const sceneCount = selectedSits.length * selectedChars.length
+  const sceneCanStart = storyId != null && selectedSits.length > 0 && selectedChars.length > 0
 
   async function start(): Promise<void> {
     setStarting(true)
@@ -59,7 +54,7 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
         await api.batches.createScene({
           story_id: storyId!,
           situation_ids: selectedSits,
-          character_tag_id: tagId!,
+          character_ids: selectedChars,
           name: name.trim(),
           prefix_prompt: prefix.trim()
         })
@@ -86,7 +81,7 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
           ストーリー（1キャラ × 全シーン）
         </button>
         <button className={tabClass(mode === 'scene')} onClick={() => setMode('scene')}>
-          シーン × タグ（複数キャラ）
+          複数キャラ × シーン
         </button>
       </div>
 
@@ -184,30 +179,25 @@ export default function BatchCreate({ onCreated }: Props): JSX.Element {
               </div>
             )}
 
-            <label className="block">
-              <span className="mb-1 block text-xs text-ink-500">キャラクタータグ</span>
-              <select
-                value={tagId ?? ''}
-                onChange={(e) => setTagId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm"
-              >
-                <option value="">選択してください</option>
-                {(tags ?? []).map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-              {tagId != null && (
-                <span className="mt-1 block text-[11px] text-ink-500">
-                  このタグのキャラ: {tagChars.length} 人
-                  {tagChars.length > 0 && `（${tagChars.slice(0, 5).map((c) => c.name).join('、')}${tagChars.length > 5 ? '…' : ''}）`}
-                </span>
-              )}
-            </label>
+            <div>
+              <div className="mb-1 flex items-center justify-between text-xs text-ink-500">
+                <span>キャラクター（手動で選択・タグで絞って一括選択）</span>
+                {selectedChars.length > 0 && (
+                  <button onClick={() => setSelectedChars([])} className="text-ink-400 hover:text-accent">
+                    全解除（{selectedChars.length}人）
+                  </button>
+                )}
+              </div>
+              <CharacterMultiGrid
+                characters={characters ?? []}
+                tags={tags ?? []}
+                value={selectedChars}
+                onChange={setSelectedChars}
+              />
+            </div>
 
             <div className="rounded-md border border-ink-700 bg-ink-900/60 px-3 py-2 text-xs text-ink-400">
-              生成枚数: {sceneCount} 枚（{selectedSits.length} シーン × {tagChars.length} キャラ）
+              生成枚数: {sceneCount} 枚（{selectedSits.length} シーン × {selectedChars.length} キャラ）
             </div>
           </>
         )}
