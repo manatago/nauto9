@@ -11,7 +11,7 @@
 const FONT = (px: number): string => `${px}px "KleeOne", "Hiragino Sans", "Noto Sans JP", sans-serif`
 
 // Balloon opacity — lets the image show through behind the bubble.
-const BUBBLE_ALPHA = 0.7
+const BUBBLE_ALPHA = 0.8
 
 // Ensure the bundled handwriting font is loaded before measuring/drawing on the
 // canvas (canvas silently falls back if the face isn't ready yet).
@@ -281,21 +281,29 @@ function jaggedBody(ctx: CanvasRenderingContext2D, w: number, h: number, seed: n
   ctx.closePath()
 }
 
-// A clean straight-triangle tail as a SEPARATE subpath; its base sits inside the
-// body so filling the union merges them with no bezier self-intersection.
+// A gently CURVED tail as a SEPARATE subpath; its base sits inside the body so
+// filling the union merges them with no self-intersection. The two sides bow
+// outward slightly (teardrop) instead of being straight lines.
 function addTail(ctx: CanvasRenderingContext2D, w: number, h: number, tip: { x: number; y: number }): void {
   const cx = w / 2
   const cy = h / 2
   const tt = Math.atan2((tip.y - cy) / (h / 2), (tip.x - cx) / (w / 2))
   const half = 0.13 // thin base
-  const rBase = 0.34 // inside both bodies so the triangle overlaps
-  const b1x = cx + Math.cos(tt - half) * w * rBase
-  const b1y = cy + Math.sin(tt - half) * h * rBase
-  const b2x = cx + Math.cos(tt + half) * w * rBase
-  const b2y = cy + Math.sin(tt + half) * h * rBase
-  ctx.moveTo(b1x, b1y)
-  ctx.lineTo(tip.x, tip.y)
-  ctx.lineTo(b2x, b2y)
+  const rBase = 0.34 // inside both bodies so the tail overlaps
+  const b1 = { x: cx + Math.cos(tt - half) * w * rBase, y: cy + Math.sin(tt - half) * h * rBase }
+  const b2 = { x: cx + Math.cos(tt + half) * w * rBase, y: cy + Math.sin(tt + half) * h * rBase }
+  const mid = { x: (b1.x + b2.x) / 2, y: (b1.y + b2.y) / 2 }
+  const al = Math.hypot(tip.x - mid.x, tip.y - mid.y) || 1
+  const norm = (p: { x: number; y: number }): { x: number; y: number } => {
+    const l = Math.hypot(p.x, p.y) || 1
+    return { x: p.x / l, y: p.y / l }
+  }
+  const o1 = norm({ x: b1.x - mid.x, y: b1.y - mid.y })
+  const o2 = norm({ x: b2.x - mid.x, y: b2.y - mid.y })
+  const bow = al * 0.22
+  ctx.moveTo(b1.x, b1.y)
+  ctx.quadraticCurveTo((b1.x + tip.x) / 2 + o1.x * bow, (b1.y + tip.y) / 2 + o1.y * bow, tip.x, tip.y)
+  ctx.quadraticCurveTo((b2.x + tip.x) / 2 + o2.x * bow, (b2.y + tip.y) / 2 + o2.y * bow, b2.x, b2.y)
   ctx.closePath()
 }
 
@@ -350,7 +358,9 @@ export function drawBubble(
   // jitter/spikes). The tail extends a bit past that toward the speaker, but NEVER
   // past the target — so it stops at the face boundary instead of entering it.
   const rEdge = ((a * b) / (Math.sqrt((b * ux) ** 2 + (a * uy) ** 2) || 1)) * 1.18
-  const visLen = Math.max(0, Math.min(dl - rEdge, fontSize * 1.5))
+  // Normal tail just pokes out a little; jagged can be a touch longer.
+  const tailCap = style === 'jagged' ? fontSize * 1.2 : fontSize * 0.7
+  const visLen = Math.max(0, Math.min(dl - rEdge, tailCap))
   const thought = style === 'cloud'
   const tip =
     thought || visLen < 2 ? null : { x: cx + ux * (rEdge + visLen), y: cy + uy * (rEdge + visLen) }
@@ -365,7 +375,8 @@ export function drawBubble(
   const octx = off.getContext('2d')
   if (!octx) return
   octx.translate(x, y)
-  if (thought) drawThoughtTail(octx, cx, cy, ux, uy, rEdge + fontSize * 0.4, fontSize)
+  // startDist < rEdge so the nearest puff overlaps the body and reads as one piece.
+  if (thought) drawThoughtTail(octx, cx, cy, ux, uy, rEdge - fontSize * 0.15, fontSize)
 
   // Body + tail as two subpaths in one path → fill (nonzero) = their union.
   if (style === 'jagged') jaggedBody(octx, w, h, seed)

@@ -18,7 +18,7 @@ import {
 import type { Generation } from '@shared/types'
 import { api } from '../api'
 import { applyFineMosaic, loadImage } from '../lib/mosaic'
-import { drawBubble, drawCaptionBand, ensureBubbleFont, measureBubble } from '../lib/bubble'
+import { drawBubble, drawCaptionBand, ensureBubbleFont, measureBubble, type BubbleLayout } from '../lib/bubble'
 import { useToast } from './Toast'
 
 interface Props {
@@ -46,6 +46,13 @@ export default function GenerationViewer({
   const [cursor, setCursor] = useState<{ x: number; y: number; d: number } | null>(null)
   // Dialogue-bubble shape: auto (by line content) or forced 通常/ギザギザ/心の中.
   const [bubbleStyle, setBubbleStyle] = useState<'auto' | 'rounded' | 'jagged' | 'cloud'>('auto')
+  // Draggable bubble preview (committed to the image on save).
+  const [bubble, setBubble] = useState<{
+    layout: BubbleLayout
+    tail: { x: number; y: number }
+    found: boolean
+    text: string
+  } | null>(null)
   const [busy, setBusy] = useState(false)
   // Previous image data, kept only right after a regenerate (1-step undo).
   // Cleared on navigation / close.
@@ -61,17 +68,22 @@ export default function GenerationViewer({
   const maskRef = useRef<HTMLCanvasElement>(null)
   const dragRef = useRef<{ x: number; y: number } | null>(null)
   const paintRef = useRef<{ x: number; y: number } | null>(null)
+  const bubbleCanvasRef = useRef<HTMLCanvasElement>(null)
+  const bubbleImgRef = useRef<HTMLImageElement | null>(null)
+  const bubblePosRef = useRef({ x: 0, y: 0 }) // top-left of the bubble, image px
+  const bubbleDragRef = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
   // Clear the mask only on a fresh entry into inpaint mode. After a re-描画 the
   // image reloads but we keep the painted region so it can be redrawn again.
   const resetMaskRef = useRef(true)
 
   const cur = generations[idx]
+  const bubbleMode = bubble !== null
   const go = useCallback(
     (d: number) => {
-      if (mosaic || inpaint) return
+      if (mosaic || inpaint || bubbleMode) return
       setIdx((i) => (i + d + generations.length) % generations.length)
     },
-    [generations.length, mosaic, inpaint]
+    [generations.length, mosaic, inpaint, bubbleMode]
   )
 
   // The undo is only valid for the image just regenerated; drop it on move.
@@ -86,10 +98,16 @@ export default function GenerationViewer({
 
   // slideshow auto-advance
   useEffect(() => {
-    if (!playing || mosaic || inpaint) return
+    if (!playing || mosaic || inpaint || bubbleMode) return
     const t = setInterval(() => setIdx((i) => (i + 1) % generations.length), 3000)
     return () => clearInterval(t)
-  }, [playing, mosaic, inpaint, generations.length])
+  }, [playing, mosaic, inpaint, bubbleMode, generations.length])
+
+  // Render the bubble preview when entering the mode (drag re-renders imperatively).
+  useEffect(() => {
+    if (bubble) renderBubblePreview()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bubble])
 
   // keyboard
   useEffect(() => {
@@ -100,17 +118,18 @@ export default function GenerationViewer({
       if (e.key === 'Escape') {
         if (mosaic) setMosaic(false)
         else if (inpaint) setInpaint(false)
+        else if (bubble) setBubble(null)
         else onClose()
       } else if (e.key === 'ArrowRight') go(1)
       else if (e.key === 'ArrowLeft') go(-1)
-      else if (e.key === ' ' && !mosaic && !inpaint) {
+      else if (e.key === ' ' && !mosaic && !inpaint && !bubble) {
         e.preventDefault()
         setPlaying((p) => !p)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [go, mosaic, inpaint, onClose])
+  }, [go, mosaic, inpaint, bubble, onClose])
 
   // load the current image into the canvas when entering mosaic / inpaint mode
   useEffect(() => {
@@ -389,11 +408,26 @@ export default function GenerationViewer({
     api.generations.setDialogue(cur.id, dialogue).then(() => onChanged())
   }
 
-  // Burn the dialogue onto the image as a speech bubble, auto-placed on the
-  // background (u2netp segmentation) so it avoids the subject/skin. Falls back to
-  // a bottom caption band for close-ups with no clear background. Revertible via
-  // the pre-edit original backup ("編集前に戻す").
-  async function burnDialogue(): Promise<void> {
+  // Redraw the live preview: the image with the bubble at its current position.
+  function renderBubblePreview(): void {
+    const canvas = bubbleCanvasRef.current
+    const img = bubbleImgRef.current
+    if (!canvas || !img || !bubble) return
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(img, 0, 0)
+    if (bubble.found) {
+      drawBubble(ctx, bubble.layout, bubblePosRef.current.x, bubblePosRef.current.y, bubble.tail)
+    } else {
+      drawCaptionBand(ctx, canvas.width, canvas.height, bubble.text)
+    }
+  }
+
+  // Compose + auto-place the dialogue bubble, then enter a draggable preview. The
+  // image is only modified on save (revertible via the "編集前に戻す" original).
+  async function startBubble(): Promise<void> {
     const text = (dialogue || cur.dialogue || '').trim()
     if (!text) {
       toast.error('セリフがありません（先に生成/入力してください）')
@@ -403,29 +437,65 @@ export default function GenerationViewer({
     try {
       await ensureBubbleFont()
       const img = await loadImage(await api.generations.imageData(cur.id))
-      const canvas = document.createElement('canvas')
-      canvas.width = img.naturalWidth
-      canvas.height = img.naturalHeight
-      const ctx = canvas.getContext('2d')
-      if (!ctx) throw new Error('canvas が使えません')
-      ctx.drawImage(img, 0, 0)
-
+      const tmp = document.createElement('canvas').getContext('2d')
+      if (!tmp) throw new Error('canvas が使えません')
       const layout = measureBubble(
-        ctx,
+        tmp,
         text,
-        canvas.width,
-        canvas.height,
+        img.naturalWidth,
+        img.naturalHeight,
         bubbleStyle === 'auto' ? undefined : bubbleStyle
       )
       const place = await api.generations.placeBubble(cur.id, layout.w, layout.h)
-      if (place.found) {
-        drawBubble(ctx, layout, place.x, place.y, { x: place.tailX, y: place.tailY })
-      } else {
-        drawCaptionBand(ctx, canvas.width, canvas.height, text)
-      }
+      bubbleImgRef.current = img
+      bubblePosRef.current = { x: place.x, y: place.y }
+      setBubble({ layout, tail: { x: place.tailX, y: place.tailY }, found: place.found, text })
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function bubbleXY(e: React.PointerEvent): { x: number; y: number } {
+    const c = bubbleCanvasRef.current!
+    const rect = c.getBoundingClientRect()
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * c.width,
+      y: ((e.clientY - rect.top) / rect.height) * c.height
+    }
+  }
+  function bubbleDown(e: React.PointerEvent): void {
+    if (!bubble?.found) return // caption is fixed at the bottom
+    const p = bubbleXY(e)
+    bubbleDragRef.current = { sx: p.x, sy: p.y, ox: bubblePosRef.current.x, oy: bubblePosRef.current.y }
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  }
+  function bubbleMoveDrag(e: React.PointerEvent): void {
+    const d = bubbleDragRef.current
+    const canvas = bubbleCanvasRef.current
+    if (!d || !canvas || !bubble) return
+    const p = bubbleXY(e)
+    bubblePosRef.current = {
+      x: Math.max(0, Math.min(d.ox + (p.x - d.sx), canvas.width - bubble.layout.w)),
+      y: Math.max(0, Math.min(d.oy + (p.y - d.sy), canvas.height - bubble.layout.h))
+    }
+    renderBubblePreview()
+  }
+  function bubbleUp(): void {
+    bubbleDragRef.current = null
+  }
+
+  async function saveBubble(): Promise<void> {
+    const canvas = bubbleCanvasRef.current
+    if (!canvas || !bubble) return
+    setBusy(true)
+    try {
+      renderBubblePreview()
       await api.generations.saveImage(cur.id, canvas.toDataURL('image/png'))
       onChanged()
-      toast.success(place.found ? 'セリフを吹き出しで配置しました' : 'セリフを下部に表示しました')
+      setBubble(null)
+      toast.success('セリフを画像に表示しました')
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
@@ -489,7 +559,7 @@ export default function GenerationViewer({
 
       {/* image / canvas */}
       <div className="relative flex min-h-0 flex-1 items-center justify-center px-12">
-        {!mosaic && !inpaint && (
+        {!mosaic && !inpaint && !bubble && (
           <button
             onClick={() => go(-1)}
             className="absolute left-2 rounded-full bg-white/10 p-2 text-ink-200 hover:bg-white/20"
@@ -497,7 +567,15 @@ export default function GenerationViewer({
             <ChevronLeft size={24} />
           </button>
         )}
-        {mosaic ? (
+        {bubble ? (
+          <canvas
+            ref={bubbleCanvasRef}
+            onPointerDown={bubbleDown}
+            onPointerMove={bubbleMoveDrag}
+            onPointerUp={bubbleUp}
+            className={`max-h-full max-w-full touch-none rounded ${bubble.found ? 'cursor-move' : ''}`}
+          />
+        ) : mosaic ? (
           <canvas
             ref={canvasRef}
             onPointerDown={onPointerDown}
@@ -528,7 +606,7 @@ export default function GenerationViewer({
         ) : (
           <img src={cur.image_url ?? ''} className="max-h-full max-w-full rounded object-contain" />
         )}
-        {!mosaic && !inpaint && (
+        {!mosaic && !inpaint && !bubble && (
           <button
             onClick={() => go(1)}
             className="absolute right-2 rounded-full bg-white/10 p-2 text-ink-200 hover:bg-white/20"
@@ -539,7 +617,7 @@ export default function GenerationViewer({
       </div>
 
       {/* per-image dialogue */}
-      {!mosaic && !inpaint && (
+      {!mosaic && !inpaint && !bubble && (
         <div className="flex items-start gap-2 border-t border-ink-700 bg-ink-900/80 px-6 py-2">
           <span className="mt-1.5 shrink-0 text-xs text-ink-500">セリフ</span>
           <textarea
@@ -570,9 +648,9 @@ export default function GenerationViewer({
             <option value="cloud">心の中</option>
           </select>
           <button
-            onClick={burnDialogue}
+            onClick={startBubble}
             disabled={busy || dlgBusy}
-            title="セリフを吹き出しとして画像に焼き込む（背景に自動配置）"
+            title="セリフを吹き出しで配置（プレビューでドラッグ移動→保存）"
             className="flex shrink-0 items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:bg-white/10 disabled:opacity-50"
           >
             {busy ? <Loader2 size={14} className="animate-spin" /> : <MessageSquareText size={14} />}
@@ -640,7 +718,26 @@ export default function GenerationViewer({
 
       {/* controls */}
       <div className="flex items-center justify-center gap-2 px-4 py-3">
-        {mosaic ? (
+        {bubble ? (
+          <>
+            <span className="mr-2 text-xs text-ink-500">
+              {bubble.found ? 'ドラッグで吹き出しを移動' : '背景が見つからず下部に表示します'}
+            </span>
+            <button
+              onClick={saveBubble}
+              disabled={busy}
+              className="rounded-md bg-accent/20 px-4 py-1.5 text-sm text-accent ring-1 ring-accent/50 hover:bg-accent/30 disabled:opacity-50"
+            >
+              保存
+            </button>
+            <button
+              onClick={() => setBubble(null)}
+              className="rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-300 hover:bg-white/10"
+            >
+              キャンセル
+            </button>
+          </>
+        ) : mosaic ? (
           <>
             <span className="mr-2 text-xs text-ink-500">ドラッグで囲む（FINE）／自動検出で局部を一括</span>
             <button
