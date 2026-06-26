@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Handwriting font for speech-bubble text (bundled, offline). */
+@font-face {
+  font-family: 'KleeOne';
+  src: url('./assets/fonts/KleeOne-SemiBold.ttf') format('truetype');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
 /* Palette as RGB channel triplets (consumed by tailwind's rgb(var(--x) / a)).
    Default = dark. `.theme-light` on <html> remaps the same semantic slots to a
    light ramp (900 = page bg … 50 = darkest text), flipping the whole UI. */

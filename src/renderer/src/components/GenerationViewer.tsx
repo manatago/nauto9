@@ -18,7 +18,7 @@ import {
 import type { Generation } from '@shared/types'
 import { api } from '../api'
 import { applyFineMosaic, loadImage } from '../lib/mosaic'
-import { drawBubble, drawCaptionBand, measureBubble } from '../lib/bubble'
+import { drawBubble, drawCaptionBand, ensureBubbleFont, measureBubble } from '../lib/bubble'
 import { useToast } from './Toast'
 
 interface Props {
@@ -401,6 +401,7 @@ export default function GenerationViewer({
     }
     setBusy(true)
     try {
+      await ensureBubbleFont()
       const img = await loadImage(await api.generations.imageData(cur.id))
       const canvas = document.createElement('canvas')
       canvas.width = img.naturalWidth
@@ -539,14 +540,15 @@ export default function GenerationViewer({
 
       {/* per-image dialogue */}
       {!mosaic && !inpaint && (
-        <div className="flex items-center gap-2 border-t border-ink-700 bg-ink-900/80 px-6 py-2">
-          <span className="shrink-0 text-xs text-ink-500">セリフ</span>
-          <input
+        <div className="flex items-start gap-2 border-t border-ink-700 bg-ink-900/80 px-6 py-2">
+          <span className="mt-1.5 shrink-0 text-xs text-ink-500">セリフ</span>
+          <textarea
             value={dialogue}
             onChange={(e) => setDialogue(e.target.value)}
             onBlur={saveDialogue}
-            placeholder="未生成 —「生成」で作成（手入力も可）"
-            className="flex-1 rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
+            rows={2}
+            placeholder="未生成 —「生成」で作成（手入力も可）。改行は吹き出しの列に反映されます"
+            className="flex-1 resize-y rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm outline-none focus:border-accent/60"
           />
           <button
             onClick={genDialogue}

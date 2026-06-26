@@ -7,7 +7,18 @@
 // spliced into the outline (or a puff-trail for thoughts), and its shape follows
 // manga convention: 'spiky' for shouting, 'cloud' for thoughts, else oval.
 
-const FONT = (px: number): string => `bold ${px}px "Hiragino Sans", "Noto Sans JP", sans-serif`
+// Handwriting font (declared in index.css); falls back to system JP fonts.
+const FONT = (px: number): string => `${px}px "KleeOne", "Hiragino Sans", "Noto Sans JP", sans-serif`
+
+// Ensure the bundled handwriting font is loaded before measuring/drawing on the
+// canvas (canvas silently falls back if the face isn't ready yet).
+export async function ensureBubbleFont(): Promise<void> {
+  try {
+    await document.fonts.load('32px "KleeOne"')
+  } catch {
+    /* fall back to system fonts */
+  }
+}
 
 type BalloonStyle = 'rounded' | 'jagged' | 'cloud'
 
@@ -52,38 +63,58 @@ function canBreakAfter(chars: string[], i: number): boolean {
   return BREAK_PUNCT.test(chars[i]) || BREAK_PARTICLE.test(chars[i])
 }
 
-// Split into vertical columns: prefer to cut at a break opportunity once a column
-// reaches `target`, hard-cut at `maxLen`. cols[0] is the rightmost column.
-function splitColumns(text: string, target: number, maxLen: number): string[][] {
+// Break priority: (1) always start a new column after 感嘆符/句読点, then
+// (2) wrap each resulting segment at 文節 boundaries, BALANCED so columns are
+// roughly even (avoid one over-long column) — never past hardCap. cols[0] is the
+// rightmost column. Manual newlines split columns too.
+function splitColumns(text: string, softCap: number, hardCap: number): string[][] {
   const out: string[][] = []
   for (const para of text.split(/\r?\n/)) {
     const chars = [...para]
-    let col: string[] = []
-    let lastBreak = 0 // column length at the last break opportunity
+    // (1) segments split at forced punctuation
+    const segments: string[][] = []
+    let seg: string[] = []
     for (let i = 0; i < chars.length; i++) {
-      col.push(chars[i])
-      const can = canBreakAfter(chars, i)
-      const forced = can && FORCE_BREAK.test(chars[i]) // 感嘆符・句読点で必ず改行
-      if (forced) {
-        out.push(col)
-        col = []
-        lastBreak = 0
-      } else if (col.length >= maxLen) {
-        const cut = lastBreak > 0 && lastBreak < col.length ? lastBreak : col.length
-        out.push(col.slice(0, cut))
-        col = col.slice(cut)
-        lastBreak = 0
-      } else if (col.length >= target && can) {
-        out.push(col)
-        col = []
-        lastBreak = 0
-      } else if (can) {
-        lastBreak = col.length
+      seg.push(chars[i])
+      if (canBreakAfter(chars, i) && FORCE_BREAK.test(chars[i])) {
+        segments.push(seg)
+        seg = []
       }
     }
-    if (col.length) out.push(col)
+    if (seg.length) segments.push(seg)
+    // (2) balanced 文節 wrap per segment
+    for (const s of segments) for (const c of balancedWrap(s, softCap, hardCap)) out.push(c)
   }
   return out.length ? out : [['']]
+}
+
+function balancedWrap(chars: string[], softCap: number, hardCap: number): string[][] {
+  const L = chars.length
+  if (L <= softCap) return [chars]
+  // Even split: pick the column count, then aim for L/count per column (≤ softCap).
+  const numCols = Math.ceil(L / softCap)
+  const target = Math.ceil(L / numCols)
+  const cols: string[][] = []
+  let col: string[] = []
+  let lastBreak = 0
+  for (let i = 0; i < L; i++) {
+    col.push(chars[i])
+    const can = canBreakAfter(chars, i)
+    if (col.length >= hardCap) {
+      const cut = lastBreak > 0 && lastBreak < col.length ? lastBreak : col.length
+      cols.push(col.slice(0, cut))
+      col = col.slice(cut)
+      lastBreak = 0
+    } else if (col.length >= target && can) {
+      cols.push(col)
+      col = []
+      lastBreak = 0
+    } else if (can) {
+      lastBreak = col.length
+    }
+  }
+  if (col.length) cols.push(col)
+  return cols
 }
 
 // Glyphs that rotate 90° in vertical writing (long vowel, dashes, brackets, …).
@@ -148,9 +179,9 @@ export function measureBubble(
   const cellW = Math.round(fontSize * 1.12)
   const cellH = Math.round(fontSize * 1.02)
   const heightCap = Math.max(4, Math.floor((imgH * 0.5) / cellH)) // image-height limit
-  const hardMax = Math.min(heightCap, 13) // force a break at 13 chars
-  const target = Math.min(hardMax, 12) // prefer to break at a 文節 by 12
-  const cols = splitColumns(text, target, hardMax)
+  const hardCap = Math.min(heightCap, 13) // never exceed 13 chars
+  const softCap = Math.min(hardCap, 12) // aim for ≤12, balanced
+  const cols = splitColumns(text, softCap, hardCap)
   const maxColLen = Math.max(1, ...cols.map((c) => c.length))
   const blockW = cols.length * cellW
   const blockH = maxColLen * cellH
