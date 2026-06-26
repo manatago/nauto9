@@ -42,6 +42,8 @@ function pickStyle(text: string): BalloonStyle {
 // (small kana, 、。, long vowel, closing brackets).
 const BREAK_PUNCT = /[、。，．！？!?…〜]/
 const BREAK_PARTICLE = /[はがをにへとでもやのかねよわぞさ]/
+// Always start a new column after these (unless the next char clings).
+const FORCE_BREAK = /[、。！？!?]/
 const NO_BREAK_BEFORE = /[、。，．！？!?…ー―々ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョ）」』】〕｝)\]]/
 
 function canBreakAfter(chars: string[], i: number): boolean {
@@ -61,7 +63,12 @@ function splitColumns(text: string, target: number, maxLen: number): string[][] 
     for (let i = 0; i < chars.length; i++) {
       col.push(chars[i])
       const can = canBreakAfter(chars, i)
-      if (col.length >= maxLen) {
+      const forced = can && FORCE_BREAK.test(chars[i]) // 感嘆符・句読点で必ず改行
+      if (forced) {
+        out.push(col)
+        col = []
+        lastBreak = 0
+      } else if (col.length >= maxLen) {
         const cut = lastBreak > 0 && lastBreak < col.length ? lastBreak : col.length
         out.push(col.slice(0, cut))
         col = col.slice(cut)
@@ -151,8 +158,8 @@ export function measureBubble(
   // Circumscribe the text block, with a minimum width so a single column isn't a
   // sliver. Jagged needs extra room so spikes' valleys clear the text.
   const mult = style === 'jagged' ? 1.2 : 1
-  const a = Math.max((blockW / 2) * 1.5 + fontSize * 0.5, fontSize * 1.7) * mult
-  const b = ((blockH / 2) * 1.42 + fontSize * 0.5) * mult
+  const a = Math.max((blockW / 2) * 1.55 + fontSize * 0.95, fontSize * 1.9) * mult
+  const b = ((blockH / 2) * 1.48 + fontSize * 0.95) * mult
   return {
     cols,
     fontSize,
@@ -358,20 +365,23 @@ export function drawBubble(
     else roundedPath(ctx, w, h, tip)
   }
 
+  const line = Math.max(1.5, fontSize * 0.06)
+  build()
+  // Stroke FIRST at double width (with the drop shadow), then paint the white fill
+  // on top. The opaque fill covers every stroke segment inside the shape — so any
+  // self-intersection at the tail base disappears and only the clean OUTER contour
+  // remains. nonzero fill treats the outermost outline as the whole bubble.
   ctx.save()
   ctx.shadowColor = 'rgba(0,0,0,0.35)'
   ctx.shadowBlur = Math.round(fontSize * 0.45)
   ctx.shadowOffsetY = Math.round(fontSize * 0.12)
-  build()
-  ctx.fillStyle = 'rgba(255,255,255,0.97)'
-  ctx.fill()
-  ctx.restore()
-
-  ctx.lineWidth = Math.max(1.5, fontSize * 0.06)
+  ctx.lineWidth = line * 2
   ctx.strokeStyle = '#1b1b1b'
   ctx.lineJoin = 'round'
-  build()
   ctx.stroke()
+  ctx.restore()
+  ctx.fillStyle = '#ffffff'
+  ctx.fill()
 
   drawColumns(ctx, layout, cx, cy, '#161616')
   ctx.restore()
