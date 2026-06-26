@@ -44,6 +44,8 @@ export default function GenerationViewer({
   // Brush-size preview ring that follows the cursor over the inpaint mask, so the
   // covered area is visible before painting. Screen px (fixed-positioned).
   const [cursor, setCursor] = useState<{ x: number; y: number; d: number } | null>(null)
+  // Dialogue-bubble shape: auto (by line content) or forced 通常/叫び/心の中.
+  const [bubbleStyle, setBubbleStyle] = useState<'auto' | 'oval' | 'spiky' | 'cloud'>('auto')
   const [busy, setBusy] = useState(false)
   // Previous image data, kept only right after a regenerate (1-step undo).
   // Cleared on navigation / close.
@@ -407,7 +409,7 @@ export default function GenerationViewer({
       if (!ctx) throw new Error('canvas が使えません')
       ctx.drawImage(img, 0, 0)
 
-      const layout = measureBubble(ctx, text, canvas.width)
+      const layout = measureBubble(ctx, text, canvas.width, bubbleStyle === 'auto' ? undefined : bubbleStyle)
       const place = await api.generations.placeBubble(cur.id, layout.w, layout.h)
       if (place.found) {
         drawBubble(ctx, layout, place.x, place.y, { x: place.tailX, y: place.tailY })
@@ -548,6 +550,17 @@ export default function GenerationViewer({
             {dlgBusy ? <Loader2 size={14} className="animate-spin" /> : null}
             {dlgBusy ? '生成中…' : cur.dialogue ? '再生成' : '生成'}
           </button>
+          <select
+            value={bubbleStyle}
+            onChange={(e) => setBubbleStyle(e.target.value as typeof bubbleStyle)}
+            title="吹き出しの形"
+            className="shrink-0 rounded-md border border-ink-600 bg-ink-900 px-2 py-1.5 text-sm text-ink-200"
+          >
+            <option value="auto">自動</option>
+            <option value="oval">通常</option>
+            <option value="spiky">叫び</option>
+            <option value="cloud">心の中</option>
+          </select>
           <button
             onClick={burnDialogue}
             disabled={busy || dlgBusy}
