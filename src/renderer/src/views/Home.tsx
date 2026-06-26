@@ -26,10 +26,10 @@ export default function Home({ onNavigate }: Props): JSX.Element {
     <div className="mx-auto max-w-5xl px-6 py-6">
       <div className="relative overflow-hidden rounded-2xl ring-1 ring-ink-700">
         <img src={heroUrl} alt="" className="h-56 w-full object-cover sm:h-72" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink-900 via-ink-900/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6">
           <h1 className="text-4xl font-black tracking-widest text-white drop-shadow">nauto9</h1>
-          <p className="mt-1 text-sm text-ink-200/90 drop-shadow">
+          <p className="mt-1 text-sm text-white/80 drop-shadow">
             ローカルで動く NovelAI キャラクター画像ジェネレーター
           </p>
         </div>
@@ -48,10 +48,10 @@ export default function Home({ onNavigate }: Props): JSX.Element {
               alt={label}
               className="absolute inset-0 h-full w-full scale-[1.4] object-cover transition duration-300 group-hover:scale-[1.5]"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-ink-900/90 via-ink-900/10 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
             <div className="absolute bottom-0 left-0 p-3 text-left">
               <div className="text-base font-bold text-white drop-shadow">{label}</div>
-              <div className="text-[11px] text-ink-200/90 drop-shadow">{desc}</div>
+              <div className="text-[11px] text-white/70 drop-shadow">{desc}</div>
             </div>
           </button>
         ))}

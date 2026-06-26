@@ -229,15 +229,15 @@ export default function Gallery(): JSX.Element {
                           className="absolute inset-0 h-full w-full object-cover opacity-70"
                         />
                       )}
-                      {/* keep the bottom dark for the name/meta text; lighten the rest */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-ink-900/90 via-ink-900/10 to-transparent" />
+                      {/* fixed-dark scrim (over an image, readable in both themes) */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
                       <div className="absolute inset-0 flex flex-col justify-between p-3">
                         <div className="flex justify-end">{statusBadge}</div>
                         <div>
                           <div className="truncate text-sm font-semibold text-white drop-shadow">
                             {b.name}
                           </div>
-                          <div className="truncate text-[11px] text-ink-200 drop-shadow">{meta}</div>
+                          <div className="truncate text-[11px] text-white/70 drop-shadow">{meta}</div>
                         </div>
                       </div>
                     </>

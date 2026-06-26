@@ -39,9 +39,9 @@ export default function StoryCardGrid({ stories, value, onChange }: Props): JSX.
                 <Check size={12} />
               </div>
             )}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-900/90 to-transparent p-1.5 pt-5">
-              <span className="block truncate text-[11px] font-medium text-ink-50">{s.name}</span>
-              <span className="text-[10px] text-ink-300">{s.situation_count} 枚</span>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-1.5 pt-5">
+              <span className="block truncate text-[11px] font-medium text-white">{s.name}</span>
+              <span className="text-[10px] text-white/70">{s.situation_count} 枚</span>
             </div>
           </button>
         )

@@ -18,7 +18,7 @@ const stop = (e: React.MouseEvent): void => e.stopPropagation()
 export function SituationCard(props: SituationCardProps): JSX.Element {
   const s = props.situation
   return (
-    <div className="group relative aspect-[3/4] overflow-hidden rounded-lg border border-ink-700 bg-ink-800">
+    <div className="force-dark group relative aspect-[3/4] overflow-hidden rounded-lg border border-ink-700 bg-ink-800">
       {s.preview_image_url ? (
         <img src={s.preview_image_url} className="absolute inset-0 h-full w-full object-cover" />
       ) : (

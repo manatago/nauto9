@@ -56,7 +56,7 @@ export default function StorySidebar({
         ) : (
           <div
             key={s.id}
-            className={`group relative overflow-hidden rounded-lg ring-1 ${
+            className={`force-dark group relative overflow-hidden rounded-lg ring-1 ${
               selectedId === s.id ? 'ring-accent/60' : 'ring-ink-700 hover:ring-ink-500'
             }`}
           >

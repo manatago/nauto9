@@ -115,8 +115,8 @@ export default function CharacterMultiGrid({ characters, tags, value, onChange }
                     <Check size={12} />
                   </div>
                 )}
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-900/90 to-transparent p-1.5 pt-5">
-                  <span className="block truncate text-[10px] text-ink-50">{c.name}</span>
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-1.5 pt-5">
+                  <span className="block truncate text-[10px] text-white">{c.name}</span>
                 </div>
               </button>
             )
