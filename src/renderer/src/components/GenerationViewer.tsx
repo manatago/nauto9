@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  MessageSquareText,
   Paintbrush,
   Pause,
   Pencil,
@@ -16,7 +17,8 @@ import {
 } from 'lucide-react'
 import type { Generation } from '@shared/types'
 import { api } from '../api'
-import { applyFineMosaic } from '../lib/mosaic'
+import { applyFineMosaic, loadImage } from '../lib/mosaic'
+import { drawBubble, drawCaptionBand, measureBubble } from '../lib/bubble'
 import { useToast } from './Toast'
 
 interface Props {
@@ -336,7 +338,7 @@ export default function GenerationViewer({
       await api.generations.restoreOriginal(cur.id)
       onChanged()
       setUndoData(null)
-      toast.success('モザイク前の画像に戻しました')
+      toast.success('編集前の画像に戻しました')
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
@@ -383,6 +385,43 @@ export default function GenerationViewer({
   function saveDialogue(): void {
     if (dialogue === (cur.dialogue ?? '')) return
     api.generations.setDialogue(cur.id, dialogue).then(() => onChanged())
+  }
+
+  // Burn the dialogue onto the image as a speech bubble, auto-placed on the
+  // background (u2netp segmentation) so it avoids the subject/skin. Falls back to
+  // a bottom caption band for close-ups with no clear background. Revertible via
+  // the pre-edit original backup ("編集前に戻す").
+  async function burnDialogue(): Promise<void> {
+    const text = (dialogue || cur.dialogue || '').trim()
+    if (!text) {
+      toast.error('セリフがありません（先に生成/入力してください）')
+      return
+    }
+    setBusy(true)
+    try {
+      const img = await loadImage(await api.generations.imageData(cur.id))
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('canvas が使えません')
+      ctx.drawImage(img, 0, 0)
+
+      const layout = measureBubble(ctx, text, canvas.width)
+      const place = await api.generations.placeBubble(cur.id, layout.w, layout.h)
+      if (place.found) {
+        drawBubble(ctx, layout, place.x, place.y, { x: place.tailX, y: place.tailY })
+      } else {
+        drawCaptionBand(ctx, canvas.width, canvas.height, text)
+      }
+      await api.generations.saveImage(cur.id, canvas.toDataURL('image/png'))
+      onChanged()
+      toast.success(place.found ? 'セリフを吹き出しで配置しました' : 'セリフを下部に表示しました')
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   // auto-detect genitals and blur each box (user can still tweak / add manually)
@@ -508,6 +547,15 @@ export default function GenerationViewer({
           >
             {dlgBusy ? <Loader2 size={14} className="animate-spin" /> : null}
             {dlgBusy ? '生成中…' : cur.dialogue ? '再生成' : '生成'}
+          </button>
+          <button
+            onClick={burnDialogue}
+            disabled={busy || dlgBusy}
+            title="セリフを吹き出しとして画像に焼き込む（背景に自動配置）"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1.5 text-sm text-ink-200 hover:bg-white/10 disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <MessageSquareText size={14} />}
+            画像に表示
           </button>
         </div>
       )}
@@ -672,9 +720,9 @@ export default function GenerationViewer({
                   onClick={restoreOriginal}
                   disabled={busy}
                   className="flex items-center gap-1.5 rounded-md border border-accent/50 px-3 py-1.5 text-sm text-accent hover:bg-accent/10 disabled:opacity-50"
-                  title="モザイク/再描画前のオリジナルに戻す"
+                  title="モザイク/再描画/セリフ表示前のオリジナルに戻す"
                 >
-                  <Undo2 size={15} /> モザイク前に戻す
+                  <Undo2 size={15} /> 編集前に戻す
                 </button>
               )
             )}

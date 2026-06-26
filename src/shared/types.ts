@@ -179,6 +179,15 @@ export interface SituationUpdateInput {
 
 export type CensorLabel = 'nipple_f' | 'penis' | 'pussy'
 
+// Where to place a dialogue bubble so it lands on background, not the subject.
+export interface BubblePlacement {
+  x: number // top-left in original image px
+  y: number
+  found: boolean // false → no clear background (close-up); use a caption fallback
+  tailX: number // subject centroid (image px) — the bubble tail points here
+  tailY: number
+}
+
 // A detected region in ORIGINAL image pixel coordinates.
 export interface CensorBox {
   x0: number
@@ -370,6 +379,7 @@ export interface Api {
     saveImage(id: number, dataUrl: string): Promise<Generation> // save edited (mosaic) image
     inpaint(id: number, maskDataUrl: string, prompt: string): Promise<Generation> // redraw masked region
     detectCensor(id: number, opts?: { conf?: number; pad?: number }): Promise<CensorBox[]> // suggest genital mosaic regions
+    placeBubble(id: number, boxW: number, boxH: number): Promise<BubblePlacement> // background spot for a dialogue bubble
     restoreOriginal(id: number): Promise<Generation> // revert to the pre-edit (pre-mosaic) original
     generateDialogue(id: number): Promise<Generation> // LLM line for one image
     setDialogue(id: number, text: string): Promise<Generation> // manual edit

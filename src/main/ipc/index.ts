@@ -22,6 +22,7 @@ import { testConnection, wpConfigFrom } from '../services/wordpress'
 import { testApiKey } from '../services/xai'
 import { generateImage, getAnlas, inpaint } from '../services/novelai'
 import { detectCensors } from '../services/censor'
+import { placeBubble } from '../services/segment'
 import { exportData, importData } from '../services/backup'
 import { buildReferenceParams, referenceMode } from '../services/reference'
 import {
@@ -307,6 +308,14 @@ export function registerIpc(): void {
     if (!g || !g.image_path) throw new Error('生成画像が見つかりません')
     const png = readFileSync(storagePathFor(g.image_path))
     return detectCensors(png, { conf: opts?.conf, pad: opts?.pad })
+  })
+
+  // find a background spot to place a dialogue bubble of the given size (px)
+  handle('generations:placeBubble', async (id: number, boxW: number, boxH: number) => {
+    const g = batchRepo.getGeneration(id)
+    if (!g || !g.image_path) throw new Error('生成画像が見つかりません')
+    const png = readFileSync(storagePathFor(g.image_path))
+    return placeBubble(png, boxW, boxH)
   })
 
   // settings
