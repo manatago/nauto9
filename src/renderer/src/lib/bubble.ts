@@ -47,22 +47,47 @@ function pickStyle(text: string): BalloonStyle {
 
 // ---- vertical text ----
 
-// Split text into vertical columns (top-to-bottom), wrapping at maxPerCol and at
-// explicit newlines. cols[0] is the first chars = the rightmost column.
-function wrapVertical(text: string, maxPerCol: number): string[][] {
-  const cols: string[][] = []
+// Phrase-ish line breaking (manga columns break at 文節 boundaries, not mid-word).
+// Heuristic, not a full morphological analyzer: break opportunities sit after
+// punctuation and after common particles, never before clinging characters
+// (small kana, 、。, long vowel, closing brackets).
+const BREAK_PUNCT = /[、。，．！？!?…〜]/
+const BREAK_PARTICLE = /[はがをにへとでもやのかねよわぞさ]/
+const NO_BREAK_BEFORE = /[、。，．！？!?…ー―々ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョ）」』】〕｝)\]]/
+
+function canBreakAfter(chars: string[], i: number): boolean {
+  const nx = chars[i + 1]
+  if (nx === undefined || NO_BREAK_BEFORE.test(nx)) return false
+  return BREAK_PUNCT.test(chars[i]) || BREAK_PARTICLE.test(chars[i])
+}
+
+// Split into vertical columns: prefer to cut at a break opportunity once a column
+// reaches `target`, hard-cut at `maxLen`. cols[0] is the rightmost column.
+function splitColumns(text: string, target: number, maxLen: number): string[][] {
+  const out: string[][] = []
   for (const para of text.split(/\r?\n/)) {
+    const chars = [...para]
     let col: string[] = []
-    for (const ch of [...para]) {
-      col.push(ch)
-      if (col.length >= maxPerCol) {
-        cols.push(col)
+    let lastBreak = 0 // column length at the last break opportunity
+    for (let i = 0; i < chars.length; i++) {
+      col.push(chars[i])
+      const can = canBreakAfter(chars, i)
+      if (col.length >= maxLen) {
+        const cut = lastBreak > 0 && lastBreak < col.length ? lastBreak : col.length
+        out.push(col.slice(0, cut))
+        col = col.slice(cut)
+        lastBreak = 0
+      } else if (col.length >= target && can) {
+        out.push(col)
         col = []
+        lastBreak = 0
+      } else if (can) {
+        lastBreak = col.length
       }
     }
-    if (col.length) cols.push(col)
+    if (col.length) out.push(col)
   }
-  return cols.length ? cols : [['']]
+  return out.length ? out : [['']]
 }
 
 // Glyphs that rotate 90° in vertical writing (long vowel, dashes, brackets, …).
@@ -126,11 +151,12 @@ export function measureBubble(
   ctx.font = FONT(fontSize)
   const cellW = Math.round(fontSize * 1.12)
   const cellH = Math.round(fontSize * 1.02)
-  const maxPerCol = Math.max(3, Math.floor((imgH * 0.5) / cellH))
-  const cols = wrapVertical(text, maxPerCol)
-  const maxLen = Math.max(1, ...cols.map((c) => c.length))
+  const colCap = Math.max(4, Math.floor((imgH * 0.5) / cellH)) // hard cap from image height
+  const target = Math.min(colCap, 7) // soft column length → breaks at phrase points
+  const cols = splitColumns(text, target, colCap)
+  const maxColLen = Math.max(1, ...cols.map((c) => c.length))
   const blockW = cols.length * cellW
-  const blockH = maxLen * cellH
+  const blockH = maxColLen * cellH
   // Ellipse circumscribing the text block, with a minimum width so a single
   // column doesn't become a sliver.
   const a = Math.max((blockW / 2) * 1.5 + fontSize * 0.5, fontSize * 1.7)

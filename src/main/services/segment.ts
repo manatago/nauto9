@@ -59,27 +59,34 @@ export async function placeBubble(png: Buffer, boxW: number, boxH: number): Prom
   if (!W || !H) throw new Error('画像の読み込みに失敗しました')
 
   const fg = await foregroundMask(png)
-  const best = bestBackgroundBox(fg, SIZE, SIZE, (boxW * SIZE) / W, (boxH * SIZE) / H)
+
+  // The speaker = the largest face (the main character). It anchors BOTH the
+  // bubble placement (sit on background near this face, not jammed to the edge)
+  // and the tail (aimed at the mouth ≈ lower-center of the face box).
+  const faces = await detectFaces(png).catch(() => [])
+  const speaker = faces.length
+    ? faces.reduce((a, b) => ((b.x1 - b.x0) * (b.y1 - b.y0) > (a.x1 - a.x0) * (a.y1 - a.y0) ? b : a))
+    : null
+
+  const attract = speaker
+    ? {
+        x: (((speaker.x0 + speaker.x1) / 2) * SIZE) / W,
+        y: (((speaker.y0 + speaker.y1) / 2) * SIZE) / H,
+        half: (((speaker.x1 - speaker.x0) / 2) * SIZE) / W
+      }
+    : undefined
+
+  const best = bestBackgroundBox(fg, SIZE, SIZE, (boxW * SIZE) / W, (boxH * SIZE) / H, attract)
   const bx = Math.round((best.x * W) / SIZE)
   const by = Math.round((best.y * H) / SIZE)
 
-  // Tail target: aim at the speaker's MOUTH. Detect faces and pick the one nearest
-  // the bubble (the character it sits beside); the mouth ≈ lower-center of the box.
-  // Fall back to the foreground centroid when no face is found.
   let tailX: number
   let tailY: number
-  const faces = await detectFaces(png).catch(() => [])
-  if (faces.length) {
-    const bcx = bx + boxW / 2
-    const bcy = by + boxH / 2
-    const speaker = faces.reduce((a, b) => {
-      const da = Math.hypot((a.x0 + a.x1) / 2 - bcx, (a.y0 + a.y1) / 2 - bcy)
-      const db = Math.hypot((b.x0 + b.x1) / 2 - bcx, (b.y0 + b.y1) / 2 - bcy)
-      return db < da ? b : a
-    })
+  if (speaker) {
     tailX = Math.round((speaker.x0 + speaker.x1) / 2)
     tailY = Math.round(speaker.y0 + (speaker.y1 - speaker.y0) * 0.72) // mouth ≈ lower face
   } else {
+    // No face: fall back to the foreground centroid.
     let sx = 0
     let sy = 0
     let sw = 0

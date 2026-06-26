@@ -8,12 +8,21 @@ export interface PlaceResult {
   meanFg: number // mean foreground probability inside the chosen box (0 = pure bg)
 }
 
+// Optional attractor (mask coords): pull the box toward the speaker's face but
+// keep a gap so it doesn't overlap the head.
+export interface Attractor {
+  x: number
+  y: number
+  half: number // half the face width, mask coords
+}
+
 export function bestBackgroundBox(
   fg: Float32Array,
   w: number,
   h: number,
   bw: number,
-  bh: number
+  bh: number,
+  attract?: Attractor
 ): PlaceResult {
   bw = Math.max(1, Math.min(Math.round(bw), w))
   bh = Math.max(1, Math.min(Math.round(bh), h))
@@ -35,6 +44,9 @@ export function bestBackgroundBox(
   const maxX = w - bw
   const maxY = h - bh
   const step = Math.max(1, Math.round(Math.min(w, h) / 48))
+  const margin = Math.min(w, h) * 0.06
+  const diag = Math.hypot(w, h)
+  const minGap = attract ? attract.half * 1.4 : 0
 
   let best: PlaceResult = { x: 0, y: 0, meanFg: Infinity }
   let bestScore = Infinity
@@ -43,13 +55,15 @@ export function bestBackgroundBox(
   const ys = positions(maxY, step)
   for (const y of ys) {
     for (const x of xs) {
-      const meanFg = rect(x, y, x + bw, y + bh) / area
-      // Mild edge preference: reward the box center being away from image center
-      // (subjects tend to be centered), so ties break toward the periphery.
-      const cx = x + bw / 2
-      const cy = y + bh / 2
-      const dist = Math.hypot((cx - w / 2) / w, (cy - h / 2) / h)
-      const score = meanFg - 0.04 * dist
+      const meanFg = rect(x, y, x + bw, y + bh) / area // 0 = pure background
+      // Keep a little margin from the image border (don't hug the edge).
+      const near = Math.min(x, w - (x + bw), y, h - (y + bh))
+      let score = meanFg + 0.15 * (near < margin ? (margin - near) / margin : 0)
+      if (attract) {
+        const dist = Math.hypot(x + bw / 2 - attract.x, y + bh / 2 - attract.y)
+        score += 0.4 * (dist / diag) // pull toward the face…
+        if (dist < minGap) score += 0.25 * ((minGap - dist) / minGap) // …but not onto it
+      }
       if (score < bestScore) {
         bestScore = score
         best = { x, y, meanFg }
