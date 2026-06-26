@@ -83,8 +83,16 @@ export async function placeBubble(png: Buffer, boxW: number, boxH: number): Prom
   let tailX: number
   let tailY: number
   if (speaker) {
-    tailX = Math.round((speaker.x0 + speaker.x1) / 2)
-    tailY = Math.round(speaker.y0 + (speaker.y1 - speaker.y0) * 0.72) // mouth ≈ lower face
+    // Aim at the point on the face box nearest the bubble (so the tail never
+    // crosses INTO the face — only hair around it). When the bubble is to the
+    // side, bias that point to mouth height (lower face), not the eyes.
+    const bcx = bx + boxW / 2
+    const bcy = by + boxH / 2
+    const cpx = Math.max(speaker.x0, Math.min(bcx, speaker.x1))
+    const cpy = Math.max(speaker.y0, Math.min(bcy, speaker.y1))
+    const onSide = cpx === speaker.x0 || cpx === speaker.x1
+    tailX = Math.round(cpx)
+    tailY = Math.round(onSide ? speaker.y0 + (speaker.y1 - speaker.y0) * 0.82 : cpy)
   } else {
     // No face: fall back to the foreground centroid.
     let sx = 0

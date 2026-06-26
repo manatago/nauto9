@@ -142,6 +142,8 @@ function balancedWrap(chars: string[], softCap: number, hardCap: number): string
 const V_ROTATE = /[ー―‐−—~〜「」『』【】〔〕（）｛｝()[\]<>＜＞…⋯]/
 // Small punctuation that sits in the upper-right of its cell.
 const V_TOPRIGHT = /[、。，．]/
+// Small kana — nudged toward the upper-right (vertical-writing convention).
+const V_SMALL_KANA = /[ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮ]/
 
 function drawVChar(
   ctx: CanvasRenderingContext2D,
@@ -156,6 +158,7 @@ function drawVChar(
   ctx.translate(x, y)
   if (V_ROTATE.test(ch)) ctx.rotate(Math.PI / 2)
   else if (V_TOPRIGHT.test(ch)) ctx.translate(fs * 0.5, -fs * 0.34) // 、。 to upper-right
+  else if (V_SMALL_KANA.test(ch)) ctx.translate(fs * 0.12, -fs * 0.08) // small kana up-right
   if (stroke) {
     ctx.lineWidth = stroke.width
     ctx.strokeStyle = stroke.color
@@ -208,10 +211,9 @@ export function measureBubble(
   const blockH = maxColLen * cellH
   const style = force ?? pickStyle(text)
   // Circumscribe the text block, with a minimum width so a single column isn't a
-  // sliver. Jagged needs extra room so spikes' valleys clear the text.
-  const mult = style === 'jagged' ? 1.2 : 1
-  const a = Math.max((blockW / 2) * 1.55 + fontSize * 0.95, fontSize * 1.9) * mult
-  const b = ((blockH / 2) * 1.48 + fontSize * 0.95) * mult
+  // sliver. (Jagged spikes are modest, so its valleys already clear the text.)
+  const a = Math.max((blockW / 2) * 1.55 + fontSize * 0.95, fontSize * 1.9)
+  const b = (blockH / 2) * 1.48 + fontSize * 0.95
   return {
     cols,
     fontSize,
@@ -234,57 +236,16 @@ function prand(seed: number): number {
   return s - Math.floor(s)
 }
 
-// Rounded balloon with organic multi-frequency jitter and a flared, curved tail.
-function roundedPath(ctx: CanvasRenderingContext2D, w: number, h: number, tip: { x: number; y: number } | null): void {
+// Rounded balloon BODY with organic multi-frequency jitter (no tail).
+function roundedBody(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const points = 72
-  const def = 1
   const cx = w / 2
   const cy = h / 2
-  const tx = tip ? tip.x - cx : 0
-  const ty = tip ? tip.y - cy : 0
-  const tailAngle = Math.atan2(ty, tx)
-  const angOffset = 0.1 // thin base
-  const sAng = (tailAngle - angOffset + Math.PI * 2) % (Math.PI * 2)
-  const eAng = (tailAngle + angOffset + Math.PI * 2) % (Math.PI * 2)
-  let tailInjected = false
   ctx.beginPath()
   for (let i = 0; i <= points; i++) {
     const angle = (i / points) * Math.PI * 2
-    const inGap = sAng < eAng ? angle >= sAng && angle <= eAng : angle >= sAng || angle <= eAng
-    if (tip && inGap) {
-      if (!tailInjected) {
-        const tipX = cx + tx
-        const tipY = cy + ty
-        let ctrlX = cx + tx / 2
-        let ctrlY = cy + ty / 2
-        const getR = (a: number): number => 0.5 - 0.08 * def + Math.sin(a * 3) * 0.02 * def
-        const xL = cx + Math.cos(sAng) * w * getR(sAng)
-        const yL = cy + Math.sin(sAng) * h * getR(sAng)
-        const xR = cx + Math.cos(eAng) * w * getR(eAng)
-        const yR = cy + Math.sin(eAng) * h * getR(eAng)
-        const midX = (xL + xR) / 2
-        const midY = (yL + yR) / 2
-        const nlen = Math.hypot(tipX - midX, tipY - midY) || 1
-        const nx = (tipX - midX) / nlen
-        const ny = (tipY - midY) / nlen
-        if ((ctrlX - midX) * nx + (ctrlY - midY) * ny < 0) {
-          ctrlX = midX + nx * 5
-          ctrlY = midY + ny * 5
-        }
-        const flareF = Math.min(w, h) * 0.04
-        const sXL = xL + (ctrlX - xL) * 0.4 - Math.sin(sAng) * flareF * (tx > 0 ? 1 : -1)
-        const sYL = yL + (ctrlY - yL) * 0.4 + Math.cos(sAng) * flareF * (ty > 0 ? 1 : -1)
-        const sXR = xR + (ctrlX - xR) * 0.4 + Math.sin(eAng) * flareF * (tx > 0 ? -1 : 1)
-        const sYR = yR + (ctrlY - yR) * 0.4 - Math.cos(eAng) * flareF * (ty > 0 ? -1 : 1)
-        ctx.lineTo(xL, yL)
-        ctx.quadraticCurveTo(sXL, sYL, tipX, tipY)
-        ctx.quadraticCurveTo(sXR, sYR, xR, yR)
-        tailInjected = true
-      }
-      continue
-    }
-    const jitter = (Math.sin(angle * 3) * 0.02 + Math.sin(angle * 7) * 0.01 + Math.cos(angle * 5) * 0.015) * def
-    const r = 0.5 - 0.08 * def + jitter
+    const jitter = Math.sin(angle * 3) * 0.02 + Math.sin(angle * 7) * 0.01 + Math.cos(angle * 5) * 0.015
+    const r = 0.42 + jitter
     const x = cx + Math.cos(angle) * w * r
     const y = cy + Math.sin(angle) * h * r
     if (i === 0) ctx.moveTo(x, y)
@@ -293,64 +254,45 @@ function roundedPath(ctx: CanvasRenderingContext2D, w: number, h: number, tip: {
   ctx.closePath()
 }
 
-// Jagged (ギザギザ) balloon: outward spikes with rounded valleys.
-function jaggedPath(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  tip: { x: number; y: number } | null,
-  seed: number
-): void {
-  const spikeCount = 36
-  const def = 1
+// Jagged (ギザギザ) balloon BODY: modest outward spikes with rounded valleys.
+function jaggedBody(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number): void {
+  const spikeCount = 32
   const cx = w / 2
   const cy = h / 2
-  const tx = tip ? tip.x - cx : 0
-  const ty = tip ? tip.y - cy : 0
-  const tailAngle = Math.atan2(ty, tx)
-  const angOffset = 0.12
-  const sAng = (tailAngle - angOffset + Math.PI * 2) % (Math.PI * 2)
-  const eAng = (tailAngle + angOffset + Math.PI * 2) % (Math.PI * 2)
-  let tailInjected = false
   const step = (Math.PI * 2) / spikeCount
   const peak = (i: number): { x: number; y: number; angle: number } => {
     const angle = i * step
-    const rOuter = 0.5 + (0.05 + prand(i * 123.456 + seed) * 0.2) * def
-    return { x: cx + Math.cos(angle) * w * rOuter, y: cy + Math.sin(angle) * h * rOuter, angle }
+    const r = 0.45 + (0.04 + prand(i * 123.456 + seed) * 0.07) // peaks ~0.49–0.56
+    return { x: cx + Math.cos(angle) * w * r, y: cy + Math.sin(angle) * h * r, angle }
   }
   ctx.beginPath()
-  let firstMove = true
+  const p0 = peak(0)
+  ctx.moveTo(p0.x, p0.y)
   for (let i = 0; i < spikeCount; i++) {
     const p1 = peak(i)
     const p2 = peak(i + 1)
-    const normAngle = p1.angle % (Math.PI * 2)
-    const inGap = sAng < eAng ? normAngle >= sAng && normAngle <= eAng : normAngle >= sAng || normAngle <= eAng
-    if (tip && inGap) {
-      if (!tailInjected) {
-        const tipX = cx + tx
-        const tipY = cy + ty
-        const rBase = 0.42
-        const xL = cx + Math.cos(sAng) * w * rBase
-        const yL = cy + Math.sin(sAng) * h * rBase
-        const xR = cx + Math.cos(eAng) * w * rBase
-        const yR = cy + Math.sin(eAng) * h * rBase
-        const ctrlX = cx + tx / 2
-        const ctrlY = cy + ty / 2
-        ctx.lineTo(xL, yL)
-        ctx.quadraticCurveTo(xL + (ctrlX - xL) * 0.4, yL + (ctrlY - yL) * 0.4, tipX, tipY)
-        ctx.quadraticCurveTo(xR + (ctrlX - xR) * 0.4, yR + (ctrlY - yR) * 0.4, xR, yR)
-        tailInjected = true
-      }
-      continue
-    }
-    if (firstMove) {
-      ctx.moveTo(p1.x, p1.y)
-      firstMove = false
-    }
     const midAngle = p1.angle + step / 2
-    const rInner = 0.42 - 0.06 * def // rounded valley, kept text-safe
+    const rInner = 0.42 // valley (clears the text)
     ctx.quadraticCurveTo(cx + Math.cos(midAngle) * w * rInner, cy + Math.sin(midAngle) * h * rInner, p2.x, p2.y)
   }
+  ctx.closePath()
+}
+
+// A clean straight-triangle tail as a SEPARATE subpath; its base sits inside the
+// body so filling the union merges them with no bezier self-intersection.
+function addTail(ctx: CanvasRenderingContext2D, w: number, h: number, tip: { x: number; y: number }): void {
+  const cx = w / 2
+  const cy = h / 2
+  const tt = Math.atan2((tip.y - cy) / (h / 2), (tip.x - cx) / (w / 2))
+  const half = 0.13 // thin base
+  const rBase = 0.34 // inside both bodies so the triangle overlaps
+  const b1x = cx + Math.cos(tt - half) * w * rBase
+  const b1y = cy + Math.sin(tt - half) * h * rBase
+  const b2x = cx + Math.cos(tt + half) * w * rBase
+  const b2y = cy + Math.sin(tt + half) * h * rBase
+  ctx.moveTo(b1x, b1y)
+  ctx.lineTo(tip.x, tip.y)
+  ctx.lineTo(b2x, b2y)
   ctx.closePath()
 }
 
@@ -401,28 +343,32 @@ export function drawBubble(
   const dl = Math.hypot(dx, dy) || 1
   const ux = dx / dl
   const uy = dy / dl
-  // Distance from center to the ellipse edge in the mouth direction.
-  const rEdge = (a * b) / (Math.sqrt((b * ux) ** 2 + (a * uy) ** 2) || 1)
-  const visLen = Math.max(fontSize * 0.7, Math.min(dl - rEdge, fontSize * 1.6)) // short tail
+  // Distance from center to the body edge in the tail direction (×1.18 to clear
+  // jitter/spikes). The tail extends a bit past that toward the speaker, but NEVER
+  // past the target — so it stops at the face boundary instead of entering it.
+  const rEdge = ((a * b) / (Math.sqrt((b * ux) ** 2 + (a * uy) ** 2) || 1)) * 1.18
+  const visLen = Math.max(0, Math.min(dl - rEdge, fontSize * 1.5))
   const thought = style === 'cloud'
-  const tip = thought ? null : { x: cx + ux * (rEdge + visLen), y: cy + uy * (rEdge + visLen) }
+  const tip =
+    thought || visLen < 2 ? null : { x: cx + ux * (rEdge + visLen), y: cy + uy * (rEdge + visLen) }
 
   ctx.save()
   ctx.translate(x, y)
 
-  if (thought) drawThoughtTail(ctx, cx, cy, ux, uy, rEdge + fontSize * 0.5, fontSize)
+  if (thought) drawThoughtTail(ctx, cx, cy, ux, uy, rEdge + fontSize * 0.4, fontSize)
 
+  // Body + tail as two subpaths in one path → fill (nonzero) = their union.
   const build = (): void => {
-    if (style === 'jagged') jaggedPath(ctx, w, h, tip, seed)
-    else roundedPath(ctx, w, h, tip)
+    if (style === 'jagged') jaggedBody(ctx, w, h, seed)
+    else roundedBody(ctx, w, h)
+    if (tip) addTail(ctx, w, h, tip)
   }
 
   const line = Math.max(1.5, fontSize * 0.06)
   build()
-  // Stroke FIRST at double width (with the drop shadow), then paint the white fill
-  // on top. The opaque fill covers every stroke segment inside the shape — so any
-  // self-intersection at the tail base disappears and only the clean OUTER contour
-  // remains. nonzero fill treats the outermost outline as the whole bubble.
+  // Stroke FIRST at double width (with the drop shadow), then paint the opaque
+  // white fill on top — the fill covers every stroke segment inside the union, so
+  // only the clean OUTER contour of (body ∪ tail) remains. No self-intersection.
   ctx.save()
   ctx.shadowColor = 'rgba(0,0,0,0.35)'
   ctx.shadowBlur = Math.round(fontSize * 0.45)
