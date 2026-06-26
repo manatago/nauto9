@@ -96,7 +96,7 @@ function drawVChar(
   ctx.save()
   ctx.translate(x, y)
   if (V_ROTATE.test(ch)) ctx.rotate(Math.PI / 2)
-  else if (V_TOPRIGHT.test(ch)) ctx.translate(fs * 0.3, -fs * 0.3)
+  else if (V_TOPRIGHT.test(ch)) ctx.translate(fs * 0.42, -fs * 0.32) // 、。 to upper-right
   if (stroke) {
     ctx.lineWidth = stroke.width
     ctx.strokeStyle = stroke.color
@@ -140,9 +140,10 @@ export function measureBubble(
   ctx.font = FONT(fontSize)
   const cellW = Math.round(fontSize * 1.12)
   const cellH = Math.round(fontSize * 1.02)
-  const colCap = Math.max(4, Math.floor((imgH * 0.5) / cellH)) // hard cap from image height
-  const target = Math.min(colCap, 7) // soft column length → breaks at phrase points
-  const cols = splitColumns(text, target, colCap)
+  const heightCap = Math.max(4, Math.floor((imgH * 0.5) / cellH)) // image-height limit
+  const hardMax = Math.min(heightCap, 13) // force a break at 13 chars
+  const target = Math.min(hardMax, 12) // prefer to break at a 文節 by 12
+  const cols = splitColumns(text, target, hardMax)
   const maxColLen = Math.max(1, ...cols.map((c) => c.length))
   const blockW = cols.length * cellW
   const blockH = maxColLen * cellH
@@ -317,7 +318,7 @@ function drawThoughtTail(
     ctx.fillStyle = 'rgba(255,255,255,0.97)'
     ctx.fill()
     ctx.restore()
-    ctx.lineWidth = Math.max(2, fontSize * 0.08)
+    ctx.lineWidth = Math.max(1.5, fontSize * 0.06)
     ctx.strokeStyle = '#1b1b1b'
     ctx.stroke()
   }
@@ -366,7 +367,7 @@ export function drawBubble(
   ctx.fill()
   ctx.restore()
 
-  ctx.lineWidth = Math.max(2, fontSize * 0.09)
+  ctx.lineWidth = Math.max(1.5, fontSize * 0.06)
   ctx.strokeStyle = '#1b1b1b'
   ctx.lineJoin = 'round'
   build()
