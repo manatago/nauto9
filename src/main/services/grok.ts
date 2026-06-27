@@ -95,6 +95,12 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
     return user
   }
 
+  // The line must be Japanese; an English meta-refusal ("No, I can't engage…")
+  // means Grok soft-refused (returned 200), so treat it as a failure to retry.
+  const isRefusal = (s: string): boolean =>
+    /\b(I can'?t|I cannot|I'?m unable|I am unable|I won'?t|can'?t (?:engage|help|assist|comply|fulfill|do that)|against (?:my|our)|as an AI|I'?m sorry,? but|I must decline|not able to)\b/i.test(
+      s
+    )
   const ask = async (withState: boolean, withVisual: boolean): Promise<string> => {
     const content = await xaiChat(
       [
@@ -103,10 +109,11 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
       ],
       { maxTokens: 120, temperature: 0.8, timeoutMs: 60_000 }
     )
+    if (isRefusal(content)) throw new Error('REFUSAL')
     return cleanGrokLine(content)
   }
   const isSafety = (e: unknown): boolean =>
-    /403|SAFETY_CHECK|permission-denied/i.test((e as Error).message)
+    /403|SAFETY_CHECK|permission-denied|REFUSAL/i.test((e as Error).message)
 
   // On a safety false-positive, retry with progressively less context: first drop
   // the auto-detected tags, then also drop the English image prompt.
