@@ -18,7 +18,14 @@ import {
 import type { Generation } from '@shared/types'
 import { api } from '../api'
 import { applyFineMosaic, loadImage } from '../lib/mosaic'
-import { drawBubble, drawCaptionBand, ensureBubbleFont, measureBubble, type BubbleLayout } from '../lib/bubble'
+import {
+  bubbleTailTip,
+  drawBubble,
+  drawCaptionBand,
+  ensureBubbleFont,
+  measureBubble,
+  type BubbleLayout
+} from '../lib/bubble'
 import { useToast } from './Toast'
 
 interface Props {
@@ -74,7 +81,8 @@ export default function GenerationViewer({
   const bubblePosRef = useRef({ x: 0, y: 0 }) // top-left of the bubble, image px
   const bubbleModeRef = useRef<'bubble' | 'narration'>('bubble')
   const bubbleTailFlipRef = useRef(false) // tail hook direction (toggled on right-click)
-  const bubbleDragRef = useRef<{ gx: number; gy: number } | null>(null) // grab offset
+  const bubbleTipRef = useRef<{ x: number; y: number } | null>(null) // manual tail tip (null = auto)
+  const bubbleDragRef = useRef<{ gx: number; gy: number; target: 'bubble' | 'tip' } | null>(null)
   // Clear the mask only on a fresh entry into inpaint mode. After a re-描画 the
   // image reloads but we keep the painted region so it can be redrawn again.
   const resetMaskRef = useRef(true)
@@ -412,7 +420,8 @@ export default function GenerationViewer({
   }
 
   // Redraw the live preview: the image with the bubble (or bottom narration).
-  function renderBubblePreview(): void {
+  // showHandle draws the draggable tail-tip handle (omit it for the saved image).
+  function renderBubblePreview(showHandle = true): void {
     const canvas = bubbleCanvasRef.current
     const img = bubbleImgRef.current
     if (!canvas || !img || !bubble) return
@@ -422,14 +431,22 @@ export default function GenerationViewer({
     if (!ctx) return
     ctx.drawImage(img, 0, 0)
     if (bubbleModeRef.current === 'bubble') {
-      drawBubble(
-        ctx,
-        bubble.layout,
-        bubblePosRef.current.x,
-        bubblePosRef.current.y,
-        bubble.tail,
-        bubbleTailFlipRef.current
-      )
+      const pos = bubblePosRef.current
+      drawBubble(ctx, bubble.layout, pos.x, pos.y, bubble.tail, bubbleTailFlipRef.current, bubbleTipRef.current)
+      // Draggable handle on the tail's converging tip (preview only, not saved).
+      const tip = bubbleTipRef.current ?? bubbleTailTip(bubble.layout, pos.x, pos.y, bubble.tail)
+      if (showHandle && tip) {
+        const r = Math.max(6, bubble.layout.fontSize * 0.35)
+        ctx.save()
+        ctx.beginPath()
+        ctx.arc(tip.x, tip.y, r, 0, Math.PI * 2)
+        ctx.fillStyle = 'rgba(255,255,255,0.9)'
+        ctx.fill()
+        ctx.lineWidth = Math.max(2, r * 0.3)
+        ctx.strokeStyle = '#2dd4bf'
+        ctx.stroke()
+        ctx.restore()
+      }
     } else {
       drawCaptionBand(ctx, canvas.width, canvas.height, bubble.text)
     }
@@ -461,6 +478,7 @@ export default function GenerationViewer({
       bubblePosRef.current = { x: place.x, y: place.y }
       bubbleModeRef.current = place.found ? 'bubble' : 'narration'
       bubbleTailFlipRef.current = false
+      bubbleTipRef.current = null
       setBubble({ layout, tail: { x: place.tailX, y: place.tailY }, text })
     } catch (e) {
       toast.error((e as Error).message)
@@ -480,20 +498,39 @@ export default function GenerationViewer({
   function bubbleDown(e: React.PointerEvent): void {
     if (!bubble) return
     const p = bubbleXY(e)
+    // Grab the tail-tip handle if the pointer is on it; else drag the bubble.
+    if (bubbleModeRef.current === 'bubble') {
+      const pos = bubblePosRef.current
+      const tip = bubbleTipRef.current ?? bubbleTailTip(bubble.layout, pos.x, pos.y, bubble.tail)
+      const hit = Math.max(bubble.layout.fontSize, 24)
+      if (tip && Math.hypot(p.x - tip.x, p.y - tip.y) <= hit) {
+        bubbleDragRef.current = { gx: 0, gy: 0, target: 'tip' }
+        ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+        return
+      }
+    }
     // Keep the grab point on the bubble when one is shown; for narration, the
     // bubble forms centered under the cursor as you drag it into the image.
     bubbleDragRef.current =
       bubbleModeRef.current === 'bubble'
-        ? { gx: p.x - bubblePosRef.current.x, gy: p.y - bubblePosRef.current.y }
-        : { gx: bubble.layout.w / 2, gy: bubble.layout.h / 2 }
+        ? { gx: p.x - bubblePosRef.current.x, gy: p.y - bubblePosRef.current.y, target: 'bubble' }
+        : { gx: bubble.layout.w / 2, gy: bubble.layout.h / 2, target: 'bubble' }
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
   }
   function bubbleMoveDrag(e: React.PointerEvent): void {
     const d = bubbleDragRef.current
     const canvas = bubbleCanvasRef.current
     if (!d || !canvas || !bubble) return
-    const { w, h, textW, textH } = bubble.layout
     const p = bubbleXY(e)
+    if (d.target === 'tip') {
+      bubbleTipRef.current = {
+        x: Math.max(0, Math.min(p.x, canvas.width)),
+        y: Math.max(0, Math.min(p.y, canvas.height))
+      }
+      renderBubblePreview()
+      return
+    }
+    const { w, h, textW, textH } = bubble.layout
     // Keep the bubble centre on the image so it's always grabbable; the padding
     // can spill off.
     const x = Math.max(-w / 2, Math.min(p.x - d.gx, canvas.width - w / 2))
@@ -523,7 +560,7 @@ export default function GenerationViewer({
     if (!canvas || !bubble) return
     setBusy(true)
     try {
-      renderBubblePreview()
+      renderBubblePreview(false) // final render without the editing handle
       await api.generations.saveImage(cur.id, canvas.toDataURL('image/png'))
       onChanged()
       setBubble(null)

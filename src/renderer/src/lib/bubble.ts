@@ -348,14 +348,40 @@ function drawThoughtTail(
   }
 }
 
-// Draw the balloon at (x,y) with a (short) tail pointing toward the speaker's mouth.
+// The tail's converging tip in IMAGE coords (or null when there's no tail), so a
+// draggable handle can sit on it. Mirrors drawBubble's auto computation.
+export function bubbleTailTip(
+  layout: BubbleLayout,
+  x: number,
+  y: number,
+  tailTarget: { x: number; y: number }
+): { x: number; y: number } | null {
+  if (layout.style === 'cloud') return null
+  const { w, h, fontSize, style } = layout
+  const cx = w / 2
+  const cy = h / 2
+  const dx = tailTarget.x - (x + cx)
+  const dy = tailTarget.y - (y + cy)
+  const dl = Math.hypot(dx, dy) || 1
+  const ux = dx / dl
+  const uy = dy / dl
+  const rEdge = (((w / 2) * (h / 2)) / (Math.sqrt(((h / 2) * ux) ** 2 + ((w / 2) * uy) ** 2) || 1)) * 1.18
+  const tailCap = style === 'jagged' ? fontSize * 1.2 : fontSize * 0.7
+  const visLen = Math.max(0, Math.min(dl - rEdge, tailCap))
+  if (visLen < 2) return null
+  return { x: x + cx + ux * (rEdge + visLen), y: y + cy + uy * (rEdge + visLen) }
+}
+
+// Draw the balloon at (x,y). The tail points at tailTarget (auto, short) unless
+// tipOverride gives an explicit tip (image coords) — e.g. the user dragged it.
 export function drawBubble(
   ctx: CanvasRenderingContext2D,
   layout: BubbleLayout,
   x: number,
   y: number,
   tailTarget: { x: number; y: number },
-  tailFlip = false
+  tailFlip = false,
+  tipOverride?: { x: number; y: number } | null
 ): void {
   const { w, h, fontSize, style, seed } = layout
   const cx = w / 2
@@ -367,16 +393,10 @@ export function drawBubble(
   const dl = Math.hypot(dx, dy) || 1
   const ux = dx / dl
   const uy = dy / dl
-  // Distance from center to the body edge in the tail direction (×1.18 to clear
-  // jitter/spikes). The tail extends a bit past that toward the speaker, but NEVER
-  // past the target — so it stops at the face boundary instead of entering it.
-  const rEdge = ((a * b) / (Math.sqrt((b * ux) ** 2 + (a * uy) ** 2) || 1)) * 1.18
-  // Normal tail just pokes out a little; jagged can be a touch longer.
-  const tailCap = style === 'jagged' ? fontSize * 1.2 : fontSize * 0.7
-  const visLen = Math.max(0, Math.min(dl - rEdge, tailCap))
+  const rEdge = ((a * b) / (Math.sqrt((b * ux) ** 2 + (a * uy) ** 2) || 1)) * 1.18 // for thought puffs
   const thought = style === 'cloud'
-  const tip =
-    thought || visLen < 2 ? null : { x: cx + ux * (rEdge + visLen), y: cy + uy * (rEdge + visLen) }
+  const tipImg = thought ? null : (tipOverride ?? bubbleTailTip(layout, x, y, tailTarget))
+  const tip = tipImg ? { x: tipImg.x - x, y: tipImg.y - y } : null
 
   // Render the balloon OPAQUE on an offscreen canvas first (so the stroke-then-fill
   // trick still hides every internal line), then composite it at BUBBLE_ALPHA so
