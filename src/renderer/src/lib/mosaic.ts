@@ -1,4 +1,5 @@
 import { api } from '../api'
+import { drawCaptionBand, ensureBubbleFont } from './bubble'
 
 // nauto8 FINE mosaic: feathered blur(12px) over a region of the canvas.
 export function applyFineMosaic(
@@ -69,4 +70,23 @@ export async function autoMosaicGeneration(genId: number): Promise<number> {
   for (const b of boxes) applyFineMosaic(ctx, canvas, b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0)
   await api.generations.saveImage(genId, canvas.toDataURL('image/png'))
   return boxes.length
+}
+
+// Headless: burn one generation's dialogue onto the image as a bottom NARRATION
+// band (the batch action's default — auto bubble placement/type is unreliable).
+// Returns false if the line is empty. Revertible per-image via 編集前に戻す.
+export async function burnNarrationGeneration(genId: number, dialogue: string): Promise<boolean> {
+  const text = dialogue.replace(/[（）()]/g, '').trim()
+  if (!text) return false
+  await ensureBubbleFont()
+  const img = await loadImage(await api.generations.imageData(genId))
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('canvas が使えません')
+  ctx.drawImage(img, 0, 0)
+  drawCaptionBand(ctx, canvas.width, canvas.height, text)
+  await api.generations.saveImage(genId, canvas.toDataURL('image/png'))
+  return true
 }

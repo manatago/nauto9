@@ -5,6 +5,7 @@ import {
   FileText,
   Loader2,
   MessageSquare,
+  MessageSquareText,
   Trash2,
   TriangleAlert,
   Wand2
@@ -12,7 +13,7 @@ import {
 import type { Batch, BatchStatus, Generation } from '@shared/types'
 import { api, useBatches } from '../api'
 import { useToast } from '../components/Toast'
-import { autoMosaicGeneration } from '../lib/mosaic'
+import { autoMosaicGeneration, burnNarrationGeneration } from '../lib/mosaic'
 import GenerationViewer from '../components/GenerationViewer'
 import ArticlePreview from '../components/ArticlePreview'
 
@@ -70,6 +71,7 @@ export default function Gallery(): JSX.Element {
   const [mosaicking, setMosaicking] = useState<{ id: number; done: number; total: number } | null>(
     null
   )
+  const [narrating, setNarrating] = useState<{ id: number; done: number; total: number } | null>(null)
 
   const toggleExpand = (id: number): void =>
     setExpanded((s) => {
@@ -117,6 +119,31 @@ export default function Gallery(): JSX.Element {
       toast.success(`${changed}/${gens.length} 枚にモザイクを適用しました`)
     } finally {
       setMosaicking(null)
+    }
+  }
+
+  // Burn every image's dialogue as a bottom NARRATION band (enabled only when all
+  // lines are filled). Overwrites originals (per-image undo is in the viewer).
+  async function batchNarrate(b: Batch): Promise<void> {
+    const gens = successOf(b)
+    if (!gens.length) return
+    if (!confirm(`「${b.name}」の ${gens.length} 枚にセリフを下部ナレーションで焼き込みます。元画像は上書きされます。`))
+      return
+    setNarrating({ id: b.id, done: 0, total: gens.length })
+    let changed = 0
+    try {
+      for (let i = 0; i < gens.length; i++) {
+        try {
+          if (await burnNarrationGeneration(gens[i].id, gens[i].dialogue)) changed++
+        } catch (e) {
+          console.error('batch narration failed for', gens[i].id, e)
+        }
+        setNarrating({ id: b.id, done: i + 1, total: gens.length })
+      }
+      mutate()
+      toast.success(`${changed}/${gens.length} 枚にセリフを表示しました`)
+    } finally {
+      setNarrating(null)
     }
   }
 
@@ -293,6 +320,25 @@ export default function Gallery(): JSX.Element {
                             {b.dialogue_running
                               ? `生成中 ${b.dialogue_count}/${success.length}`
                               : 'セリフ一括生成'}
+                          </button>
+                          <button
+                            onClick={() => batchNarrate(b)}
+                            disabled={
+                              success.length === 0 ||
+                              !success.every((g) => g.dialogue.trim().length > 0) ||
+                              narrating !== null
+                            }
+                            title="全画像のセリフを下部ナレーションで焼き込む（全セリフが埋まっていると押せます）"
+                            className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+                          >
+                            {narrating?.id === b.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <MessageSquareText size={14} />
+                            )}
+                            {narrating?.id === b.id
+                              ? `表示 ${narrating.done}/${narrating.total}`
+                              : 'セリフを画像に表示'}
                           </button>
                           <button
                             onClick={() => setArticleBatch(b.id)}
