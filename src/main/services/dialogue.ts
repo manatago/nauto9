@@ -1,7 +1,11 @@
+import { readFileSync } from 'fs'
+import type { EmotionTag } from '@shared/types'
 import * as repo from '../db/repo'
 import * as sit from '../db/situations'
 import * as batches from '../db/batches'
 import { generateDialogueGrok } from './grok'
+import { detectEmotion, detectPoseScene } from './emotion'
+import { storagePathFor } from '../paths'
 import { replaceXxx } from './prompt'
 
 // Gather context for one generation (character + story + situation) and ask the
@@ -31,6 +35,23 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
   // Lines already used on other images in this batch — avoid repeating them.
   const avoid = batches.dialoguesInBatch(g.batch_id, genId)
 
+  // Read the image's expression / pose / situation locally (WD14) to ground the
+  // line in what's actually shown. Best-effort: skip silently if unavailable.
+  let emotion: EmotionTag[] = []
+  let pose: EmotionTag[] = []
+  let scene: EmotionTag[] = []
+  if (g.image_path) {
+    try {
+      const png = readFileSync(storagePathFor(g.image_path))
+      emotion = await detectEmotion(png)
+      const ps = await detectPoseScene(png)
+      pose = ps.pose
+      scene = ps.scene
+    } catch (e) {
+      console.error('[dialogue] image tagger skipped:', (e as Error).message)
+    }
+  }
+
   const line = await generateDialogueGrok({
     character: char.name,
     traits,
@@ -39,7 +60,10 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
     situation,
     visual,
     samples,
-    avoid
+    avoid,
+    emotion,
+    pose,
+    scene
   })
   batches.setDialogue(genId, line)
 }

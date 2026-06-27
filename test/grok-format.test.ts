@@ -13,12 +13,16 @@ describe('cleanGrokLine', () => {
   })
 })
 
-const ctx = (over: Partial<{ situation: string; samples: string[]; visual: string }> = {}) => ({
+type EmoTag = { tag: string; label: string; score: number }
+const ctx = (
+  over: Partial<{ situation: string; samples: string[]; visual: string; emotion: EmoTag[] }> = {}
+) => ({
   situation: '',
   samples: [] as string[],
   visual: '',
   ...over
 })
+const emo = (...tags: string[]): EmoTag[] => tags.map((t) => ({ tag: t, label: t, score: 0.9 }))
 
 describe('classifyScene', () => {
   it('detects an explicit inner-voice request in the notes', () => {
@@ -28,9 +32,16 @@ describe('classifyScene', () => {
     expect(classifyScene(ctx({ visual: '1girl, french kiss' })).kissing).toBe(true)
     expect(classifyScene(ctx({ situation: 'キスしている' })).kissing).toBe(true)
   })
-  it('detects closed mouth from the image tags', () => {
+  it('detects closed mouth from the prompt when no image tags', () => {
     expect(classifyScene(ctx({ visual: 'closed mouth, blush' })).closedMouth).toBe(true)
     expect(classifyScene(ctx({ visual: 'open mouth' })).closedMouth).toBe(false)
+  })
+  it('prefers detected image tags for mouth state', () => {
+    // image says open → not closed, even if the prompt says closed
+    expect(classifyScene(ctx({ visual: 'closed mouth', emotion: emo('open_mouth') })).closedMouth).toBe(
+      false
+    )
+    expect(classifyScene(ctx({ emotion: emo('closed_mouth', 'blush') })).closedMouth).toBe(true)
   })
   it('a plain scene flags nothing', () => {
     const f = classifyScene(ctx({ situation: 'プールサイドに座る', visual: 'school swimsuit, sitting' }))

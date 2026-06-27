@@ -20,14 +20,20 @@ export interface SceneFlags {
 
 // Decide the dialogue output mode from the scene/visual context. Inner monologue
 // when she isn't speaking aloud (explicit request, kissing); moans vs words is
-// gated on the mouth being closed.
+// gated on the mouth being closed. Mouth state prefers the IMAGE-detected tags
+// (emotion) over the prompt text when available.
 export function classifyScene(
-  ctx: Pick<DialogueContext, 'situation' | 'samples' | 'visual'>
+  ctx: Pick<DialogueContext, 'situation' | 'samples' | 'visual' | 'emotion'>
 ): SceneFlags {
   const sceneText = [ctx.situation, ...ctx.samples].join(' ')
+  const emo = (ctx.emotion ?? []).map((e) => e.tag)
+  const open = ['open_mouth', ':d', ':o', 'tongue_out'].some((t) => emo.includes(t))
+  const closedMouth = emo.length
+    ? emo.includes('closed_mouth') && !open
+    : /closed[\s_]?mouth/i.test(ctx.visual)
   return {
     wantsInner: /心の声|内心|心の中|モノローグ|独白/.test(sceneText),
     kissing: /kiss/i.test(ctx.visual) || /キス|接吻/.test(sceneText),
-    closedMouth: /closed[\s_]?mouth/i.test(ctx.visual)
+    closedMouth
   }
 }
