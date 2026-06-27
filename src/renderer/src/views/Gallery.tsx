@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   ChevronDown,
+  ChevronRight,
   Download,
   FileText,
   Loader2,
@@ -288,65 +289,61 @@ export default function Gallery(): JSX.Element {
                             先頭: {b.prefix_prompt}
                           </span>
                         )}
-                        <div className="ml-auto flex items-center gap-1.5">
-                          {success.length > 1 && (
-                            <button
-                              onClick={() => setViewer({ batchId: b.id, index: 0 })}
-                              className="rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent"
-                            >
-                              スライドショー
-                            </button>
+                        {/* primary actions, left-aligned in workflow order with arrows */}
+                        <button
+                          onClick={() => genDialogues(b)}
+                          disabled={success.length === 0 || b.dialogue_running}
+                          className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+                        >
+                          <MessageSquare size={14} />{' '}
+                          {b.dialogue_running
+                            ? `生成中 ${b.dialogue_count}/${success.length}`
+                            : 'セリフ一括生成'}
+                        </button>
+                        <ChevronRight size={14} className="shrink-0 text-ink-600" />
+                        <button
+                          onClick={() => batchMosaic(b)}
+                          disabled={success.length === 0 || mosaicking !== null}
+                          className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+                        >
+                          {mosaicking?.id === b.id ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Wand2 size={14} />
                           )}
-                          <button
-                            onClick={() => batchMosaic(b)}
-                            disabled={success.length === 0 || mosaicking !== null}
-                            className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
-                          >
-                            {mosaicking?.id === b.id ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <Wand2 size={14} />
-                            )}
-                            {mosaicking?.id === b.id
-                              ? `モザイク ${mosaicking.done}/${mosaicking.total}`
-                              : '一括モザイク'}
-                          </button>
-                          <button
-                            onClick={() => genDialogues(b)}
-                            disabled={success.length === 0 || b.dialogue_running}
-                            className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
-                          >
-                            <MessageSquare size={14} />{' '}
-                            {b.dialogue_running
-                              ? `生成中 ${b.dialogue_count}/${success.length}`
-                              : 'セリフ一括生成'}
-                          </button>
-                          <button
-                            onClick={() => batchNarrate(b)}
-                            disabled={
-                              success.length === 0 ||
-                              !success.every((g) => g.dialogue.trim().length > 0) ||
-                              narrating !== null
-                            }
-                            title="全画像のセリフを下部ナレーションで焼き込む（全セリフが埋まっていると押せます）"
-                            className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
-                          >
-                            {narrating?.id === b.id ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <MessageSquareText size={14} />
-                            )}
-                            {narrating?.id === b.id
-                              ? `表示 ${narrating.done}/${narrating.total}`
-                              : 'セリフを画像に表示'}
-                          </button>
-                          <button
-                            onClick={() => setArticleBatch(b.id)}
-                            disabled={success.length === 0}
-                            className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
-                          >
-                            <FileText size={14} /> 記事作成
-                          </button>
+                          {mosaicking?.id === b.id
+                            ? `モザイク ${mosaicking.done}/${mosaicking.total}`
+                            : '一括モザイク'}
+                        </button>
+                        <ChevronRight size={14} className="shrink-0 text-ink-600" />
+                        <button
+                          onClick={() => batchNarrate(b)}
+                          disabled={
+                            success.length === 0 ||
+                            !success.every((g) => g.dialogue.trim().length > 0) ||
+                            narrating !== null
+                          }
+                          title="全画像のセリフを下部ナレーションで焼き込む（全セリフが埋まっていると押せます）"
+                          className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+                        >
+                          {narrating?.id === b.id ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <MessageSquareText size={14} />
+                          )}
+                          {narrating?.id === b.id
+                            ? `表示 ${narrating.done}/${narrating.total}`
+                            : 'セリフを画像に表示'}
+                        </button>
+                        <ChevronRight size={14} className="shrink-0 text-ink-600" />
+                        <button
+                          onClick={() => setArticleBatch(b.id)}
+                          disabled={success.length === 0}
+                          className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2.5 py-1 text-xs text-ink-200 hover:border-accent/60 hover:text-accent disabled:opacity-40"
+                        >
+                          <FileText size={14} /> 記事作成
+                        </button>
+                        <div className="ml-auto flex items-center gap-1.5">
                           <button
                             onClick={() => download(b)}
                             disabled={success.length === 0 || downloading === b.id}
