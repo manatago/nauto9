@@ -73,6 +73,7 @@ export default function GenerationViewer({
   const bubbleImgRef = useRef<HTMLImageElement | null>(null)
   const bubblePosRef = useRef({ x: 0, y: 0 }) // top-left of the bubble, image px
   const bubbleModeRef = useRef<'bubble' | 'narration'>('bubble')
+  const bubbleTailFlipRef = useRef(false) // tail hook direction (toggled on right-click)
   const bubbleDragRef = useRef<{ gx: number; gy: number } | null>(null) // grab offset
   // Clear the mask only on a fresh entry into inpaint mode. After a re-描画 the
   // image reloads but we keep the painted region so it can be redrawn again.
@@ -421,7 +422,14 @@ export default function GenerationViewer({
     if (!ctx) return
     ctx.drawImage(img, 0, 0)
     if (bubbleModeRef.current === 'bubble') {
-      drawBubble(ctx, bubble.layout, bubblePosRef.current.x, bubblePosRef.current.y, bubble.tail)
+      drawBubble(
+        ctx,
+        bubble.layout,
+        bubblePosRef.current.x,
+        bubblePosRef.current.y,
+        bubble.tail,
+        bubbleTailFlipRef.current
+      )
     } else {
       drawCaptionBand(ctx, canvas.width, canvas.height, bubble.text)
     }
@@ -452,6 +460,7 @@ export default function GenerationViewer({
       bubbleImgRef.current = img
       bubblePosRef.current = { x: place.x, y: place.y }
       bubbleModeRef.current = place.found ? 'bubble' : 'narration'
+      bubbleTailFlipRef.current = false
       setBubble({ layout, tail: { x: place.tailX, y: place.tailY }, text })
     } catch (e) {
       toast.error((e as Error).message)
@@ -500,6 +509,13 @@ export default function GenerationViewer({
   }
   function bubbleUp(): void {
     bubbleDragRef.current = null
+  }
+  // Right-click flips the tail's curve direction (only when a tail is shown).
+  function bubbleContext(e: React.MouseEvent): void {
+    e.preventDefault()
+    if (bubbleModeRef.current !== 'bubble' || bubble?.layout.style === 'cloud') return
+    bubbleTailFlipRef.current = !bubbleTailFlipRef.current
+    renderBubblePreview()
   }
 
   async function saveBubble(): Promise<void> {
@@ -589,6 +605,7 @@ export default function GenerationViewer({
             onPointerDown={bubbleDown}
             onPointerMove={bubbleMoveDrag}
             onPointerUp={bubbleUp}
+            onContextMenu={bubbleContext}
             className="max-h-full max-w-full cursor-move touch-none rounded"
           />
         ) : mosaic ? (
@@ -737,7 +754,7 @@ export default function GenerationViewer({
         {bubble ? (
           <>
             <span className="mr-2 text-xs text-ink-500">
-              ドラッグで移動。画像内へ＝吹き出し／文字が外へ出る＝下部ナレーション
+              ドラッグで移動（文字が外へ出ると下部ナレーション）。右クリックで尻尾の向き反転
             </span>
             <button
               onClick={saveBubble}

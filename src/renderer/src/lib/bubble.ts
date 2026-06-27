@@ -289,7 +289,13 @@ function jaggedBody(ctx: CanvasRenderingContext2D, w: number, h: number, seed: n
 // inside the body so filling the union merges them with no self-intersection.
 // Both sides bend the SAME way (perpendicular to the tail axis), so the tail
 // curves to one side and stays sharp at the tip — not a symmetric teardrop.
-function addTail(ctx: CanvasRenderingContext2D, w: number, h: number, tip: { x: number; y: number }): void {
+function addTail(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  tip: { x: number; y: number },
+  flip: boolean
+): void {
   const cx = w / 2
   const cy = h / 2
   const tt = Math.atan2((tip.y - cy) / (h / 2), (tip.x - cx) / (w / 2))
@@ -301,9 +307,11 @@ function addTail(ctx: CanvasRenderingContext2D, w: number, h: number, tip: { x: 
   const ax = tip.x - mid.x
   const ay = tip.y - mid.y
   const al = Math.hypot(ax, ay) || 1
-  // Perpendicular to the tail axis; both control points shift the same way.
-  const px = -ay / al
-  const py = ax / al
+  // Perpendicular to the tail axis; both control points shift the same way. `flip`
+  // reverses which side the hook curves toward.
+  const s = flip ? -1 : 1
+  const px = (-ay / al) * s
+  const py = (ax / al) * s
   const bend = al * 0.38
   ctx.moveTo(b1.x, b1.y)
   ctx.quadraticCurveTo((b1.x + tip.x) / 2 + px * bend, (b1.y + tip.y) / 2 + py * bend, tip.x, tip.y)
@@ -346,7 +354,8 @@ export function drawBubble(
   layout: BubbleLayout,
   x: number,
   y: number,
-  tailTarget: { x: number; y: number }
+  tailTarget: { x: number; y: number },
+  tailFlip = false
 ): void {
   const { w, h, fontSize, style, seed } = layout
   const cx = w / 2
@@ -385,7 +394,7 @@ export function drawBubble(
   // Body + tail as two subpaths in one path → fill (nonzero) = their union.
   if (style === 'jagged') jaggedBody(octx, w, h, seed)
   else roundedBody(octx, w, h)
-  if (tip) addTail(octx, w, h, tip)
+  if (tip) addTail(octx, w, h, tip, tailFlip)
 
   const line = Math.max(1.5, fontSize * 0.06)
   octx.save()
