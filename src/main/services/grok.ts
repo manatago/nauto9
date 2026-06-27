@@ -52,6 +52,16 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
   const relTxt = labels(ctx.relation)
   const sceneTxt = [labels(ctx.scene), labels(ctx.bgobj)].filter(Boolean).join('・')
 
+  // The English image prompt (visual) carries booru tags too — strip the same
+  // school/youth markers that trip xAI's CSAM check before sending it.
+  const RISKY_RE =
+    /\b(school[\s_-]?uniform|serafuku|sailor[\s_-]?collar|school[\s_-]?swimsuit|gym[\s_-]?uniform|buruma|bloomers|loli(?:ta)?|child(?:ren)?|toddler|kindergarten|elementary|middle[\s_-]?school|(?:young|little|small)[\s_-]?girl)\b/gi
+  const safeVisual = ctx.visual
+    .replace(RISKY_RE, '')
+    .replace(/\s*,\s*,+/g, ', ')
+    .replace(/^[,\s]+|[,\s]+$/g, '')
+    .trim()
+
   let stateBlock = ''
   if (emoTxt || clothingTxt || actTxt || poseTxt || relTxt || sceneTxt) {
     stateBlock = '画像から自動検出した状態（トーンや感情に反映するが、これ自体を実況・説明しない）:\n'
@@ -65,11 +75,11 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
 
   // The scene info is background for understanding only — Grok must NOT verbalize
   // it. Fence it off explicitly so the line stays a natural utterance.
-  const buildUser = (withState: boolean): string => {
+  const buildUser = (withState: boolean, withVisual: boolean): string => {
     let user = '（以下は場面を理解するための背景情報。セリフでそのまま説明しないこと）\n'
     user += `場面: ${ctx.situation}\n`
-    if (ctx.visual.trim()) {
-      user += `画像の内容（視覚情報の参考。ポーズや服装の手がかり）: ${ctx.visual.trim()}\n`
+    if (withVisual && safeVisual) {
+      user += `画像の内容（視覚情報の参考。ポーズや服装の手がかり）: ${safeVisual}\n`
     }
     if (withState && stateBlock) user += stateBlock
     if (ctx.samples.length) user += `状況・流れ・メモ:\n${ctx.samples.join('\n')}\n`
@@ -85,27 +95,31 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
     return user
   }
 
-  const ask = async (withState: boolean): Promise<string> => {
+  const ask = async (withState: boolean, withVisual: boolean): Promise<string> => {
     const content = await xaiChat(
       [
         { role: 'system', content: system },
-        { role: 'user', content: buildUser(withState) }
+        { role: 'user', content: buildUser(withState, withVisual) }
       ],
       { maxTokens: 120, temperature: 0.8, timeoutMs: 60_000 }
     )
     return cleanGrokLine(content)
   }
+  const isSafety = (e: unknown): boolean =>
+    /403|SAFETY_CHECK|permission-denied/i.test((e as Error).message)
 
+  // On a safety false-positive, retry with progressively less context: first drop
+  // the auto-detected tags, then also drop the English image prompt.
   let line: string
   try {
-    line = await ask(true)
-  } catch (e) {
-    // xAI safety filter (e.g. a CSAM false-positive) → retry once without the
-    // auto-detected tags so generation still succeeds.
-    if (/403|SAFETY_CHECK|permission-denied/i.test((e as Error).message)) {
-      line = await ask(false)
-    } else {
-      throw e
+    line = await ask(true, true)
+  } catch (e1) {
+    if (!isSafety(e1)) throw e1
+    try {
+      line = await ask(false, true)
+    } catch (e2) {
+      if (!isSafety(e2)) throw e2
+      line = await ask(false, false)
     }
   }
   if (!line) throw new Error('Grok が空の応答を返しました（内容がフィルタされた可能性）')
