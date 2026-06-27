@@ -535,6 +535,13 @@ export default function GenerationViewer({
     // can spill off.
     const x = Math.max(-w / 2, Math.min(p.x - d.gx, canvas.width - w / 2))
     const y = Math.max(-h / 2, Math.min(p.y - d.gy, canvas.height - h / 2))
+    // Move a manually-set tail tip along with the bubble (auto tip re-aims itself).
+    if (bubbleTipRef.current) {
+      bubbleTipRef.current = {
+        x: bubbleTipRef.current.x + (x - bubblePosRef.current.x),
+        y: bubbleTipRef.current.y + (y - bubblePosRef.current.y)
+      }
+    }
     bubblePosRef.current = { x, y }
     // The TEXT (not the padding) must fit fully inside to stay a bubble; otherwise
     // it becomes the bottom narration.
