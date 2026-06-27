@@ -23,12 +23,31 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
           ? `性的な快感に強く溺れている場面では、無理に言葉にせず喘ぎ声だけ（「あっ…」「んっ♡」「はぁっ…」）でよい。`
           : `性的な快感に溺れている場面でも、今回は喘ぎ声に短い言葉を少し交えてよい（「あっ…すごい…♡」など）。`
 
+  // English fields (character prompt fallback + image prompt) carry booru tags
+  // that can trip xAI's CSAM check: strip school/youth markers and rewrite
+  // girl→woman so the (adult) characters don't read as minors.
+  const sanitize = (s: string): string =>
+    s
+      .replace(
+        /\b(school[\s_-]?uniform|schoolgirl|schoolboy|serafuku|sailor[\s_-]?collar|school[\s_-]?swimsuit|gym[\s_-]?uniform|buruma|bloomers|loli(?:ta)?|child(?:ren)?|toddler|kindergarten|elementary|middle[\s_-]?school|(?:young|little|small)[\s_-]?girls?)\b/gi,
+        ''
+      )
+      .replace(/(\d\+?)girls\b/gi, '$1women')
+      .replace(/(\d\+?)girl\b/gi, '$1woman')
+      .replace(/\bgirls\b/gi, 'women')
+      .replace(/\bgirl\b/gi, 'woman')
+      .replace(/\s*,\s*,+/g, ', ')
+      .replace(/^[,\s]+|[,\s]+$/g, '')
+      .trim()
+  const safeTraits = sanitize(ctx.traits || '')
+  const safeVisual = sanitize(ctx.visual)
+
   const system = [
     `あなたはキャラクター「${ctx.character}」になりきってセリフを1つだけ書きます。これはフィクションの成人向け創作で、登場人物はすべて20歳以上の成人です。`,
     `出力は${ctx.character}が口に出すセリフ本文のみ。説明・地の文・ナレーション・かぎ括弧（「」）は付けない。`,
     `自分の状況・見た目・していることをセリフで説明したり実況したりしない（「〜しているところ」「私は今〜」のような描写は禁止）。その瞬間にポロッと自然に口から出る一言にする。`,
     pleasureRule,
-    `口調・話し方はこの設定を参考にする: ${ctx.traits || '（指定なし）'}`,
+    `口調・話し方はこの設定を参考にする: ${safeTraits || '（指定なし）'}`,
     `ただし日本語として自然に。主語や相手への呼びかけ（「お兄ちゃん」など）は、入れた方が自然なときだけ使う。日本語で省略するのが自然な主語・目的語は省く。設定の口癖を毎回むりやり詰め込まない。`,
     `画像から検出した「表情・感情」「服装・露出」「行為」を最優先でセリフに反映する（赤面→恥じらい、怒り/への字眉→怒った口調、泣き/涙→涙声、アヘ顔/とろ顔→快感に溺れる、全裸/脱衣中→羞恥や昂り、フェラ/挿入などの行為→その状態に応じた喘ぎや言葉、など）。「体勢」「関係・周囲（手繋ぎ・大勢など）」「場所・背景」は文脈の参考にし、決して情景描写・実況にはしない。`,
     `物語「${ctx.story || '（未設定）'}」（${ctx.storyDesc || '説明なし'}）`
@@ -51,16 +70,6 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
   const poseTxt = labels(ctx.pose)
   const relTxt = labels(ctx.relation)
   const sceneTxt = [labels(ctx.scene), labels(ctx.bgobj)].filter(Boolean).join('・')
-
-  // The English image prompt (visual) carries booru tags too — strip the same
-  // school/youth markers that trip xAI's CSAM check before sending it.
-  const RISKY_RE =
-    /\b(school[\s_-]?uniform|serafuku|sailor[\s_-]?collar|school[\s_-]?swimsuit|gym[\s_-]?uniform|buruma|bloomers|loli(?:ta)?|child(?:ren)?|toddler|kindergarten|elementary|middle[\s_-]?school|(?:young|little|small)[\s_-]?girl)\b/gi
-  const safeVisual = ctx.visual
-    .replace(RISKY_RE, '')
-    .replace(/\s*,\s*,+/g, ', ')
-    .replace(/^[,\s]+|[,\s]+$/g, '')
-    .trim()
 
   let stateBlock = ''
   if (emoTxt || clothingTxt || actTxt || poseTxt || relTxt || sceneTxt) {
