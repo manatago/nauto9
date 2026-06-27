@@ -15,6 +15,7 @@ files:
   - '!.smoke'
   - '!.smoke-data'
   - '!.detect-exp'
+  - '!.model-cache'
   - '!build'
   - '!dist'
   - '!docs'
