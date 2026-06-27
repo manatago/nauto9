@@ -281,9 +281,10 @@ function jaggedBody(ctx: CanvasRenderingContext2D, w: number, h: number, seed: n
   ctx.closePath()
 }
 
-// A gently CURVED tail as a SEPARATE subpath; its base sits inside the body so
-// filling the union merges them with no self-intersection. The two sides bow
-// outward slightly (teardrop) instead of being straight lines.
+// A CURVED, pointed (hook-shaped) tail as a SEPARATE subpath; its base sits
+// inside the body so filling the union merges them with no self-intersection.
+// Both sides bend the SAME way (perpendicular to the tail axis), so the tail
+// curves to one side and stays sharp at the tip — not a symmetric teardrop.
 function addTail(ctx: CanvasRenderingContext2D, w: number, h: number, tip: { x: number; y: number }): void {
   const cx = w / 2
   const cy = h / 2
@@ -293,17 +294,16 @@ function addTail(ctx: CanvasRenderingContext2D, w: number, h: number, tip: { x: 
   const b1 = { x: cx + Math.cos(tt - half) * w * rBase, y: cy + Math.sin(tt - half) * h * rBase }
   const b2 = { x: cx + Math.cos(tt + half) * w * rBase, y: cy + Math.sin(tt + half) * h * rBase }
   const mid = { x: (b1.x + b2.x) / 2, y: (b1.y + b2.y) / 2 }
-  const al = Math.hypot(tip.x - mid.x, tip.y - mid.y) || 1
-  const norm = (p: { x: number; y: number }): { x: number; y: number } => {
-    const l = Math.hypot(p.x, p.y) || 1
-    return { x: p.x / l, y: p.y / l }
-  }
-  const o1 = norm({ x: b1.x - mid.x, y: b1.y - mid.y })
-  const o2 = norm({ x: b2.x - mid.x, y: b2.y - mid.y })
-  const bow = al * 0.22
+  const ax = tip.x - mid.x
+  const ay = tip.y - mid.y
+  const al = Math.hypot(ax, ay) || 1
+  // Perpendicular to the tail axis; both control points shift the same way.
+  const px = -ay / al
+  const py = ax / al
+  const bend = al * 0.38
   ctx.moveTo(b1.x, b1.y)
-  ctx.quadraticCurveTo((b1.x + tip.x) / 2 + o1.x * bow, (b1.y + tip.y) / 2 + o1.y * bow, tip.x, tip.y)
-  ctx.quadraticCurveTo((b2.x + tip.x) / 2 + o2.x * bow, (b2.y + tip.y) / 2 + o2.y * bow, b2.x, b2.y)
+  ctx.quadraticCurveTo((b1.x + tip.x) / 2 + px * bend, (b1.y + tip.y) / 2 + py * bend, tip.x, tip.y)
+  ctx.quadraticCurveTo((b2.x + tip.x) / 2 + px * bend, (b2.y + tip.y) / 2 + py * bend, b2.x, b2.y)
   ctx.closePath()
 }
 
