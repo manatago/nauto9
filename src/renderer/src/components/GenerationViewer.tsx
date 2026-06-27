@@ -15,7 +15,7 @@ import {
   Wand2,
   X
 } from 'lucide-react'
-import type { EmotionTag, Generation, PoseScene } from '@shared/types'
+import type { EmotionTag, Generation, ImageTags } from '@shared/types'
 import { api } from '../api'
 import { applyFineMosaic, loadImage } from '../lib/mosaic'
 import {
@@ -72,10 +72,8 @@ export default function GenerationViewer({
   const [sitPrompt, setSitPrompt] = useState('')
   const [dialogue, setDialogue] = useState('')
   const [dlgBusy, setDlgBusy] = useState(false) // separate so its spinner shows on the right button
-  const [emotions, setEmotions] = useState<EmotionTag[] | null>(null) // WD14 expression read
-  const [emoBusy, setEmoBusy] = useState(false)
-  const [poseScene, setPoseScene] = useState<PoseScene | null>(null) // WD14 pose + location read
-  const [psBusy, setPsBusy] = useState(false)
+  const [imageTags, setImageTags] = useState<ImageTags | null>(null) // WD14 full read
+  const [tagsBusy, setTagsBusy] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const maskRef = useRef<HTMLCanvasElement>(null)
   const dragRef = useRef<{ x: number; y: number } | null>(null)
@@ -104,8 +102,7 @@ export default function GenerationViewer({
   // The undo is only valid for the image just regenerated; drop it on move.
   useEffect(() => {
     setUndoData(null)
-    setEmotions(null)
-    setPoseScene(null)
+    setImageTags(null)
   }, [idx])
 
   // Keep the dialogue field synced with the current image (and after gen).
@@ -425,32 +422,19 @@ export default function GenerationViewer({
     api.generations.setDialogue(cur.id, dialogue).then(() => onChanged())
   }
 
-  // Read the character's facial expression (WD14 tagger; downloads the model on
-  // first use). For now this is just a visual readout.
-  async function detectEmo(): Promise<void> {
-    setEmoBusy(true)
+  // Analyze the image locally (WD14): expression / clothing / act / pose /
+  // relation / scene. Downloads the model on first use. Visual readout for now.
+  async function detectTags(): Promise<void> {
+    setTagsBusy(true)
     try {
-      const tags = await api.generations.detectEmotion(cur.id)
-      setEmotions(tags)
-      if (!tags.length) toast.push('表情タグが検出されませんでした')
+      const t = await api.generations.detectImageTags(cur.id)
+      setImageTags(t)
+      const total = t.emotion.length + t.clothing.length + t.act.length + t.pose.length + t.relation.length + t.scene.length + t.bgobj.length
+      if (!total) toast.push('タグが検出されませんでした')
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
-      setEmoBusy(false)
-    }
-  }
-
-  // Read body pose + location from the whole image (WD14, local).
-  async function detectPS(): Promise<void> {
-    setPsBusy(true)
-    try {
-      const r = await api.generations.detectPoseScene(cur.id)
-      setPoseScene(r)
-      if (!r.pose.length && !r.scene.length) toast.push('ポーズ・状況タグが検出されませんでした')
-    } catch (e) {
-      toast.error((e as Error).message)
-    } finally {
-      setPsBusy(false)
+      setTagsBusy(false)
     }
   }
 
@@ -773,82 +757,48 @@ export default function GenerationViewer({
         </div>
       )}
 
-      {/* facial-expression readout (WD14, local) */}
+      {/* image analysis readout (WD14, local) — expression / clothing / act / … */}
       {!mosaic && !inpaint && !bubble && (
-        <div className="flex items-center gap-2 border-t border-ink-700 bg-ink-900/60 px-6 py-1.5">
-          <span className="shrink-0 text-xs text-ink-500">感情</span>
-          <div className="flex flex-1 flex-wrap items-center gap-1.5">
-            {emotions === null ? (
-              <span className="text-xs text-ink-600">未判定</span>
-            ) : emotions.length === 0 ? (
-              <span className="text-xs text-ink-600">検出なし</span>
+        <div className="flex items-start gap-2 border-t border-ink-700 bg-ink-900/60 px-6 py-1.5">
+          <span className="mt-0.5 shrink-0 text-xs text-ink-500">解析</span>
+          <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+            {imageTags === null ? (
+              <span className="text-xs text-ink-600">未解析（ボタンで判定）</span>
             ) : (
-              emotions.map((e) => (
-                <span
-                  key={e.tag}
-                  className="rounded-full bg-ink-700 px-2 py-0.5 text-xs text-ink-200"
-                  title={`${e.tag} ${Math.round(e.score * 100)}%`}
-                >
-                  {e.label}
-                  <span className="ml-1 text-ink-500">{Math.round(e.score * 100)}%</span>
-                </span>
-              ))
+              ([
+                ['表情', imageTags.emotion],
+                ['服装', imageTags.clothing],
+                ['行為', imageTags.act],
+                ['体勢', imageTags.pose],
+                ['関係', imageTags.relation],
+                ['場所', [...imageTags.scene, ...imageTags.bgobj]]
+              ] as [string, EmotionTag[]][])
+                .filter(([, tags]) => tags.length)
+                .map(([name, tags]) => (
+                  <span key={name} className="flex flex-wrap items-center gap-1">
+                    <span className="text-[10px] text-ink-600">{name}:</span>
+                    {tags.map((e) => (
+                      <span
+                        key={`${name}-${e.tag}`}
+                        className="rounded-full bg-ink-700 px-2 py-0.5 text-xs text-ink-200"
+                        title={`${e.tag} ${Math.round(e.score * 100)}%`}
+                      >
+                        {e.label}
+                        <span className="ml-1 text-ink-500">{Math.round(e.score * 100)}%</span>
+                      </span>
+                    ))}
+                  </span>
+                ))
             )}
           </div>
           <button
-            onClick={detectEmo}
-            disabled={emoBusy}
-            title="表情を判定（初回はモデルを自動ダウンロード・約310MB）"
+            onClick={detectTags}
+            disabled={tagsBusy}
+            title="画像を解析（表情・服装・行為・体勢・関係・場所）。初回はモデル自動DL（約310MB）"
             className="flex shrink-0 items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1 text-xs text-ink-200 hover:bg-white/10 disabled:opacity-50"
           >
-            {emoBusy ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
-            {emoBusy ? '判定中…' : '感情を判定'}
-          </button>
-        </div>
-      )}
-
-      {/* pose + situation readout (WD14 on the whole image) */}
-      {!mosaic && !inpaint && !bubble && (
-        <div className="flex items-center gap-2 border-t border-ink-700 bg-ink-900/60 px-6 py-1.5">
-          <span className="shrink-0 text-xs text-ink-500">ポーズ・状況</span>
-          <div className="flex flex-1 flex-wrap items-center gap-1.5">
-            {poseScene === null ? (
-              <span className="text-xs text-ink-600">未判定</span>
-            ) : poseScene.pose.length === 0 && poseScene.scene.length === 0 ? (
-              <span className="text-xs text-ink-600">検出なし</span>
-            ) : (
-              <>
-                {poseScene.pose.map((e) => (
-                  <span
-                    key={`p-${e.tag}`}
-                    className="rounded-full bg-ink-700 px-2 py-0.5 text-xs text-ink-200"
-                    title={`${e.tag} ${Math.round(e.score * 100)}%`}
-                  >
-                    {e.label}
-                    <span className="ml-1 text-ink-500">{Math.round(e.score * 100)}%</span>
-                  </span>
-                ))}
-                {poseScene.scene.map((e) => (
-                  <span
-                    key={`s-${e.tag}`}
-                    className="rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent"
-                    title={`${e.tag} ${Math.round(e.score * 100)}%`}
-                  >
-                    {e.label}
-                    <span className="ml-1 text-accent/60">{Math.round(e.score * 100)}%</span>
-                  </span>
-                ))}
-              </>
-            )}
-          </div>
-          <button
-            onClick={detectPS}
-            disabled={psBusy}
-            title="ポーズと場所・背景を判定（画像全体から）"
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1 text-xs text-ink-200 hover:bg-white/10 disabled:opacity-50"
-          >
-            {psBusy ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
-            {psBusy ? '判定中…' : 'ポーズ・状況を判定'}
+            {tagsBusy ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+            {tagsBusy ? '解析中…' : '画像を解析'}
           </button>
         </div>
       )}

@@ -1,10 +1,10 @@
 import { readFileSync } from 'fs'
-import type { EmotionTag } from '@shared/types'
+import type { ImageTags } from '@shared/types'
 import * as repo from '../db/repo'
 import * as sit from '../db/situations'
 import * as batches from '../db/batches'
 import { generateDialogueGrok } from './grok'
-import { detectEmotion, detectPoseScene } from './emotion'
+import { detectImageTags } from './emotion'
 import { storagePathFor } from '../paths'
 import { replaceXxx } from './prompt'
 
@@ -35,18 +35,12 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
   // Lines already used on other images in this batch — avoid repeating them.
   const avoid = batches.dialoguesInBatch(g.batch_id, genId)
 
-  // Read the image's expression / pose / situation locally (WD14) to ground the
-  // line in what's actually shown. Best-effort: skip silently if unavailable.
-  let emotion: EmotionTag[] = []
-  let pose: EmotionTag[] = []
-  let scene: EmotionTag[] = []
+  // Read the image's expression / clothing / act / pose / situation locally
+  // (WD14) to ground the line in what's actually shown. Best-effort.
+  let tags: Partial<ImageTags> = {}
   if (g.image_path) {
     try {
-      const png = readFileSync(storagePathFor(g.image_path))
-      emotion = await detectEmotion(png)
-      const ps = await detectPoseScene(png)
-      pose = ps.pose
-      scene = ps.scene
+      tags = await detectImageTags(readFileSync(storagePathFor(g.image_path)))
     } catch (e) {
       console.error('[dialogue] image tagger skipped:', (e as Error).message)
     }
@@ -61,9 +55,7 @@ export async function generateDialogueForGeneration(genId: number): Promise<void
     visual,
     samples,
     avoid,
-    emotion,
-    pose,
-    scene
+    ...tags
   })
   batches.setDialogue(genId, line)
 }

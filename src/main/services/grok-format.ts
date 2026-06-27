@@ -23,17 +23,20 @@ export interface SceneFlags {
 // gated on the mouth being closed. Mouth state prefers the IMAGE-detected tags
 // (emotion) over the prompt text when available.
 export function classifyScene(
-  ctx: Pick<DialogueContext, 'situation' | 'samples' | 'visual' | 'emotion'>
+  ctx: Pick<DialogueContext, 'situation' | 'samples' | 'visual' | 'emotion' | 'act'>
 ): SceneFlags {
   const sceneText = [ctx.situation, ...ctx.samples].join(' ')
   const emo = (ctx.emotion ?? []).map((e) => e.tag)
+  const act = (ctx.act ?? []).map((e) => e.tag)
   const open = ['open_mouth', ':d', ':o', 'tongue_out'].some((t) => emo.includes(t))
   const closedMouth = emo.length
     ? emo.includes('closed_mouth') && !open
     : /closed[\s_]?mouth/i.test(ctx.visual)
+  // Mouth occupied (→ inner monologue / muffled): kissing, or an oral act she's giving.
+  const mouthBusyAct = ['fellatio', 'deepthroat', 'irrumatio'].some((t) => act.includes(t))
   return {
     wantsInner: /心の声|内心|心の中|モノローグ|独白/.test(sceneText),
-    kissing: /kiss/i.test(ctx.visual) || /キス|接吻/.test(sceneText),
+    kissing: mouthBusyAct || /kiss/i.test(ctx.visual) || /キス|接吻/.test(sceneText),
     closedMouth
   }
 }

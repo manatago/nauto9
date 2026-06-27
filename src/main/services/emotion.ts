@@ -4,7 +4,7 @@ import { createWriteStream, existsSync, readFileSync } from 'fs'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { join } from 'path'
-import type { EmotionTag } from '@shared/types'
+import type { EmotionTag, ImageTags } from '@shared/types'
 import { modelCacheDir } from '../paths'
 import { detectFaces } from './face'
 
@@ -152,6 +152,119 @@ const SCENE: Record<string, string> = {
   rain: '雨'
 }
 
+// Clothing / exposure / undressing-in-progress (whole image).
+const CLOTHING: Record<string, string> = {
+  completely_nude: '全裸',
+  nude: '裸',
+  topless: 'トップレス',
+  bottomless: '下半身裸',
+  breasts_out: '胸出し',
+  nipples: '乳首露出',
+  no_bra: 'ノーブラ',
+  no_panties: 'ノーパン',
+  undressing: '脱衣中',
+  clothes_lift: '服まくり',
+  shirt_lift: 'シャツまくり',
+  skirt_lift: 'スカートまくり',
+  clothes_pull: '服引っ張り',
+  panty_pull: 'パンツずらし',
+  bra_lift: 'ブラずらし',
+  strap_slip: '肩紐ずれ',
+  clothing_aside: 'ずらし',
+  open_shirt: 'シャツはだけ',
+  open_clothes: '服はだけ',
+  unbuttoned: 'ボタン外し',
+  untied: '紐ほどけ',
+  school_uniform: '制服',
+  serafuku: 'セーラー服',
+  swimsuit: '水着',
+  bikini: 'ビキニ',
+  school_swimsuit: 'スク水',
+  bra: 'ブラ',
+  panties: 'パンツ',
+  lingerie: '下着',
+  kimono: '着物',
+  maid: 'メイド服',
+  nurse: 'ナース服',
+  gym_uniform: '体操服',
+  buruma: 'ブルマ',
+  thighhighs: 'ニーソ',
+  pantyhose: 'パンスト'
+}
+
+// Sexual act / position (whole image).
+const ACT: Record<string, string> = {
+  sex: 'セックス',
+  vaginal: '挿入(膣)',
+  anal: 'アナル',
+  oral: 'オーラル',
+  fellatio: 'フェラ',
+  deepthroat: 'ディープスロート',
+  irrumatio: 'イラマチオ',
+  cunnilingus: 'クンニ',
+  paizuri: 'パイズリ',
+  handjob: '手コキ',
+  fingering: '指マン',
+  masturbation: 'オナニー',
+  doggystyle: '後背位',
+  cowgirl_position: '騎乗位',
+  missionary: '正常位',
+  girl_on_top: '女性上位',
+  sex_from_behind: '後ろから',
+  imminent_penetration: '挿入直前',
+  after_sex: '事後',
+  breast_grab: '胸揉み',
+  ass_grab: '尻掴み',
+  nipple_tweak: '乳首いじり',
+  spread_pussy: '開帳',
+  cum: '精液',
+  cumshot: '射精',
+  cum_in_pussy: '中出し',
+  cum_on_body: '顔/体射'
+}
+
+// People count / relationships / contact (whole image).
+const RELATION: Record<string, string> = {
+  solo: '一人',
+  multiple_girls: '複数の女性',
+  '2girls': '女性2人',
+  '3girls': '女性3人',
+  '6+girls': '女性大勢',
+  '1boy': '男性1人',
+  '2boys': '男性2人',
+  multiple_boys: '複数の男性',
+  crowd: '群衆',
+  people: '人々',
+  hetero: '男女',
+  yuri: '百合',
+  hug: '抱擁',
+  holding_hands: '手繋ぎ',
+  interlocked_fingers: '指を絡める',
+  kiss: 'キス',
+  arm_around_shoulder: '肩を抱く',
+  carrying: '抱えてる',
+  princess_carry: 'お姫様抱っこ'
+}
+
+// Distinct background objects (whole image).
+const BGOBJ: Record<string, string> = {
+  mountain: '山',
+  mountainous_horizon: '山並み',
+  tree: '木',
+  cherry_blossoms: '桜',
+  flower: '花',
+  water: '水',
+  river: '川',
+  lake: '湖',
+  building: '建物',
+  skyscraper: '高層ビル',
+  bridge: '橋',
+  road: '道',
+  bed: 'ベッド',
+  window: '窓',
+  grass: '草'
+}
+
 async function download(url: string, dest: string): Promise<void> {
   const res = await fetch(url)
   if (!res.ok || !res.body) throw new Error(`モデルのダウンロードに失敗しました (${res.status})`)
@@ -166,13 +279,17 @@ interface TagIndex {
 interface Ready {
   session: ort.InferenceSession
   emo: TagIndex[]
+  clothing: TagIndex[]
+  act: TagIndex[]
   pose: TagIndex[]
+  relation: TagIndex[]
   scene: TagIndex[]
+  bgobj: TagIndex[]
 }
 let readyPromise: Promise<Ready> | null = null
 
 // Map each curated tag (category 0) to its model output index.
-function buildIndices(csvPath: string): { emo: TagIndex[]; pose: TagIndex[]; scene: TagIndex[] } {
+function buildIndices(csvPath: string): Omit<Ready, 'session'> {
   const rows = readFileSync(csvPath, 'utf8').split('\n')
   const idxByName = new Map<string, number>()
   // Row 0 is the header; data row i maps to model output index i.
@@ -185,7 +302,15 @@ function buildIndices(csvPath: string): { emo: TagIndex[]; pose: TagIndex[]; sce
       const index = idxByName.get(tag)
       return index === undefined ? [] : [{ index, tag, label }]
     })
-  return { emo: pick(EMO), pose: pick(POSE), scene: pick(SCENE) }
+  return {
+    emo: pick(EMO),
+    clothing: pick(CLOTHING),
+    act: pick(ACT),
+    pose: pick(POSE),
+    relation: pick(RELATION),
+    scene: pick(SCENE),
+    bgobj: pick(BGOBJ)
+  }
 }
 
 async function init(): Promise<Ready> {
@@ -256,16 +381,19 @@ async function faceCrop(png: Buffer): Promise<Electron.NativeImage> {
   return full.crop({ x, y, width: w, height: h })
 }
 
-// Facial expression — read from the cropped face for a sharper signal.
-export async function detectEmotion(png: Buffer): Promise<EmotionTag[]> {
-  const { session, emo } = await getReady()
-  const probs = await runTagger(session, await faceCrop(png))
-  return extract(probs, emo, THRESHOLD, TOP_N)
-}
-
-// Pose + situation — read from the WHOLE image (the face crop loses body/scene).
-export async function detectPoseScene(png: Buffer): Promise<{ pose: EmotionTag[]; scene: EmotionTag[] }> {
-  const { session, pose, scene } = await getReady()
-  const probs = await runTagger(session, nativeImage.createFromBuffer(png))
-  return { pose: extract(probs, pose, 0.3, 6), scene: extract(probs, scene, 0.3, 6) }
+// Full read: expression from the FACE crop (sharper), everything else from the
+// WHOLE image (clothing/act/pose/relation/scene/background need the body & scene).
+export async function detectImageTags(png: Buffer): Promise<ImageTags> {
+  const r = await getReady()
+  const faceProbs = await runTagger(r.session, await faceCrop(png))
+  const fullProbs = await runTagger(r.session, nativeImage.createFromBuffer(png))
+  return {
+    emotion: extract(faceProbs, r.emo, THRESHOLD, TOP_N),
+    clothing: extract(fullProbs, r.clothing, 0.3, 8),
+    act: extract(fullProbs, r.act, 0.25, 6),
+    pose: extract(fullProbs, r.pose, 0.3, 6),
+    relation: extract(fullProbs, r.relation, 0.3, 5),
+    scene: extract(fullProbs, r.scene, 0.3, 4),
+    bgobj: extract(fullProbs, r.bgobj, 0.3, 5)
+  }
 }

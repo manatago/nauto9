@@ -196,10 +196,16 @@ export interface EmotionTag {
   score: number // 0..1 confidence
 }
 
-// Body pose + location/background read from the whole image.
-export interface PoseScene {
-  pose: EmotionTag[]
-  scene: EmotionTag[]
+// Everything read from one image (WD14, local): expression from the face crop,
+// the rest from the whole image.
+export interface ImageTags {
+  emotion: EmotionTag[] // facial expression
+  clothing: EmotionTag[] // clothing / exposure / undressing
+  act: EmotionTag[] // sexual act / position
+  pose: EmotionTag[] // body pose
+  relation: EmotionTag[] // people count / contact
+  scene: EmotionTag[] // location / setting
+  bgobj: EmotionTag[] // distinct background objects
 }
 
 // A detected region in ORIGINAL image pixel coordinates.
@@ -394,8 +400,7 @@ export interface Api {
     inpaint(id: number, maskDataUrl: string, prompt: string): Promise<Generation> // redraw masked region
     detectCensor(id: number, opts?: { conf?: number; pad?: number }): Promise<CensorBox[]> // suggest genital mosaic regions
     placeBubble(id: number, boxW: number, boxH: number): Promise<BubblePlacement> // background spot for a dialogue bubble
-    detectEmotion(id: number): Promise<EmotionTag[]> // facial expression tags (WD14, local)
-    detectPoseScene(id: number): Promise<PoseScene> // body pose + location tags (WD14, local)
+    detectImageTags(id: number): Promise<ImageTags> // expression/clothing/act/pose/relation/scene/bg (WD14, local)
     restoreOriginal(id: number): Promise<Generation> // revert to the pre-edit (pre-mosaic) original
     generateDialogue(id: number): Promise<Generation> // LLM line for one image
     setDialogue(id: number, text: string): Promise<Generation> // manual edit

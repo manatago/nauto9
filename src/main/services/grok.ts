@@ -30,14 +30,17 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
     pleasureRule,
     `口調・話し方はこの設定を参考にする: ${ctx.traits || '（指定なし）'}`,
     `ただし日本語として自然に。主語や相手への呼びかけ（「お兄ちゃん」など）は、入れた方が自然なときだけ使う。日本語で省略するのが自然な主語・目的語は省く。設定の口癖を毎回むりやり詰め込まない。`,
-    `画像から検出した「表情・感情」を最優先でセリフのトーンに反映する（赤面→恥じらい、怒り/への字眉→怒った／拗ねた口調、泣き/涙→涙声、アヘ顔/とろ顔→快感に溺れる、など）。「体勢」「場所」は雰囲気の参考程度にとどめ、説明はしない。`,
+    `画像から検出した「表情・感情」「服装・露出」「行為」を最優先でセリフに反映する（赤面→恥じらい、怒り/への字眉→怒った口調、泣き/涙→涙声、アヘ顔/とろ顔→快感に溺れる、全裸/脱衣中→羞恥や昂り、フェラ/挿入などの行為→その状態に応じた喘ぎや言葉、など）。「体勢」「関係・周囲（手繋ぎ・大勢など）」「場所・背景」は文脈の参考にし、決して情景描写・実況にはしない。`,
     `物語「${ctx.story || '（未設定）'}」（${ctx.storyDesc || '説明なし'}）`
   ].join('\n')
 
   const labels = (arr?: { label: string }[]): string => (arr ?? []).map((e) => e.label).join('・')
   const emoTxt = labels(ctx.emotion)
+  const clothingTxt = labels(ctx.clothing)
+  const actTxt = labels(ctx.act)
   const poseTxt = labels(ctx.pose)
-  const sceneTxt = labels(ctx.scene)
+  const relTxt = labels(ctx.relation)
+  const sceneTxt = [labels(ctx.scene), labels(ctx.bgobj)].filter(Boolean).join('・')
 
   // The scene info is background for understanding only — Grok must NOT verbalize
   // it. Fence it off explicitly so the line stays a natural utterance.
@@ -46,10 +49,13 @@ export async function generateDialogueGrok(ctx: DialogueContext): Promise<string
   if (ctx.visual.trim()) {
     user += `画像の内容（視覚情報の参考。ポーズや服装の手がかり）: ${ctx.visual.trim()}\n`
   }
-  if (emoTxt || poseTxt || sceneTxt) {
+  if (emoTxt || clothingTxt || actTxt || poseTxt || relTxt || sceneTxt) {
     user += '画像から自動検出した状態（トーンや感情に反映するが、これ自体を実況・説明しない）:\n'
     if (emoTxt) user += `  表情・感情: ${emoTxt}\n`
+    if (clothingTxt) user += `  服装・露出: ${clothingTxt}\n`
+    if (actTxt) user += `  行為・体位: ${actTxt}\n`
     if (poseTxt) user += `  体勢: ${poseTxt}\n`
+    if (relTxt) user += `  関係・周囲: ${relTxt}\n`
     if (sceneTxt) user += `  場所・背景: ${sceneTxt}\n`
   }
   if (ctx.samples.length) {
