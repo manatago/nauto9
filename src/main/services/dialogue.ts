@@ -80,7 +80,8 @@ async function runWorker(): Promise<void> {
     while (queue.length) {
       const batchId = queue.shift() as number
       try {
-        for (const genId of batches.successGenerationIds(batchId)) {
+        // Only fill images without a line yet — never overwrite existing ones.
+        for (const genId of batches.successGenerationIdsNeedingDialogue(batchId)) {
           try {
             await generateDialogueForGeneration(genId)
           } catch (e) {

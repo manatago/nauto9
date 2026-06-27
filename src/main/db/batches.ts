@@ -326,6 +326,28 @@ export function successGenerationIds(batchId: number): number[] {
   ).map((r) => r.id)
 }
 
+// Success images whose dialogue is missing OR a leftover English meta-refusal
+// (e.g. "No, I can't engage…" saved before refusal-detection). Batch generation
+// fills only these, so re-running it never overwrites a real (Japanese) line.
+export function successGenerationIdsNeedingDialogue(batchId: number): number[] {
+  return (
+    getDb()
+      .prepare(
+        `SELECT id FROM generations WHERE batch_id = ? AND status = 'success' AND (
+           TRIM(dialogue) = ''
+           OR dialogue LIKE '%can''t engage%'
+           OR dialogue LIKE '%I can''t%'
+           OR dialogue LIKE '%I cannot%'
+           OR dialogue LIKE '%I''m unable%'
+           OR dialogue LIKE '%I am unable%'
+           OR dialogue LIKE '%as an AI%'
+           OR dialogue LIKE '%I must decline%'
+         ) ORDER BY seq, id`
+      )
+      .all(batchId) as { id: number }[]
+  ).map((r) => r.id)
+}
+
 // Replace a generation's image with a new file, deleting the old one.
 export function setGenerationImage(id: number, newPath: string): void {
   const db = getDb()
