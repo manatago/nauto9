@@ -46,11 +46,12 @@ export default function GenerationViewer({
   const [cursor, setCursor] = useState<{ x: number; y: number; d: number } | null>(null)
   // Dialogue-bubble shape: auto (by line content) or forced 通常/ギザギザ/心の中.
   const [bubbleStyle, setBubbleStyle] = useState<'auto' | 'rounded' | 'jagged' | 'cloud'>('auto')
-  // Draggable bubble preview (committed to the image on save).
+  // Draggable bubble preview (committed to the image on save). Renders as a speech
+  // bubble or a bottom narration band depending on whether the TEXT fits inside
+  // the image at the current drag position (bubbleModeRef).
   const [bubble, setBubble] = useState<{
     layout: BubbleLayout
     tail: { x: number; y: number }
-    found: boolean
     text: string
   } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -71,7 +72,8 @@ export default function GenerationViewer({
   const bubbleCanvasRef = useRef<HTMLCanvasElement>(null)
   const bubbleImgRef = useRef<HTMLImageElement | null>(null)
   const bubblePosRef = useRef({ x: 0, y: 0 }) // top-left of the bubble, image px
-  const bubbleDragRef = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
+  const bubbleModeRef = useRef<'bubble' | 'narration'>('bubble')
+  const bubbleDragRef = useRef<{ gx: number; gy: number } | null>(null) // grab offset
   // Clear the mask only on a fresh entry into inpaint mode. After a re-描画 the
   // image reloads but we keep the painted region so it can be redrawn again.
   const resetMaskRef = useRef(true)
@@ -408,7 +410,7 @@ export default function GenerationViewer({
     api.generations.setDialogue(cur.id, dialogue).then(() => onChanged())
   }
 
-  // Redraw the live preview: the image with the bubble at its current position.
+  // Redraw the live preview: the image with the bubble (or bottom narration).
   function renderBubblePreview(): void {
     const canvas = bubbleCanvasRef.current
     const img = bubbleImgRef.current
@@ -418,7 +420,7 @@ export default function GenerationViewer({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.drawImage(img, 0, 0)
-    if (bubble.found) {
+    if (bubbleModeRef.current === 'bubble') {
       drawBubble(ctx, bubble.layout, bubblePosRef.current.x, bubblePosRef.current.y, bubble.tail)
     } else {
       drawCaptionBand(ctx, canvas.width, canvas.height, bubble.text)
@@ -449,7 +451,8 @@ export default function GenerationViewer({
       const place = await api.generations.placeBubble(cur.id, layout.w, layout.h)
       bubbleImgRef.current = img
       bubblePosRef.current = { x: place.x, y: place.y }
-      setBubble({ layout, tail: { x: place.tailX, y: place.tailY }, found: place.found, text })
+      bubbleModeRef.current = place.found ? 'bubble' : 'narration'
+      setBubble({ layout, tail: { x: place.tailX, y: place.tailY }, text })
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
@@ -466,24 +469,33 @@ export default function GenerationViewer({
     }
   }
   function bubbleDown(e: React.PointerEvent): void {
-    if (!bubble?.found) return // caption is fixed at the bottom
+    if (!bubble) return
     const p = bubbleXY(e)
-    bubbleDragRef.current = { sx: p.x, sy: p.y, ox: bubblePosRef.current.x, oy: bubblePosRef.current.y }
+    // Keep the grab point on the bubble when one is shown; for narration, the
+    // bubble forms centered under the cursor as you drag it into the image.
+    bubbleDragRef.current =
+      bubbleModeRef.current === 'bubble'
+        ? { gx: p.x - bubblePosRef.current.x, gy: p.y - bubblePosRef.current.y }
+        : { gx: bubble.layout.w / 2, gy: bubble.layout.h / 2 }
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
   }
   function bubbleMoveDrag(e: React.PointerEvent): void {
     const d = bubbleDragRef.current
     const canvas = bubbleCanvasRef.current
     if (!d || !canvas || !bubble) return
+    const { w, h, textW, textH } = bubble.layout
     const p = bubbleXY(e)
-    // Allow the bubble to spill off the image (kept ≥20% visible so it's not
-    // lost); the canvas clips whatever lands outside (overflow:hidden-like).
-    const mx = bubble.layout.w * 0.2
-    const my = bubble.layout.h * 0.2
-    bubblePosRef.current = {
-      x: Math.max(-bubble.layout.w + mx, Math.min(d.ox + (p.x - d.sx), canvas.width - mx)),
-      y: Math.max(-bubble.layout.h + my, Math.min(d.oy + (p.y - d.sy), canvas.height - my))
-    }
+    // Keep the bubble centre on the image so it's always grabbable; the padding
+    // can spill off.
+    const x = Math.max(-w / 2, Math.min(p.x - d.gx, canvas.width - w / 2))
+    const y = Math.max(-h / 2, Math.min(p.y - d.gy, canvas.height - h / 2))
+    bubblePosRef.current = { x, y }
+    // The TEXT (not the padding) must fit fully inside to stay a bubble; otherwise
+    // it becomes the bottom narration.
+    const tx = x + (w - textW) / 2
+    const ty = y + (h - textH) / 2
+    const inside = tx >= 0 && ty >= 0 && tx + textW <= canvas.width && ty + textH <= canvas.height
+    bubbleModeRef.current = inside ? 'bubble' : 'narration'
     renderBubblePreview()
   }
   function bubbleUp(): void {
@@ -577,7 +589,7 @@ export default function GenerationViewer({
             onPointerDown={bubbleDown}
             onPointerMove={bubbleMoveDrag}
             onPointerUp={bubbleUp}
-            className={`max-h-full max-w-full touch-none rounded ${bubble.found ? 'cursor-move' : ''}`}
+            className="max-h-full max-w-full cursor-move touch-none rounded"
           />
         ) : mosaic ? (
           <canvas
@@ -725,7 +737,7 @@ export default function GenerationViewer({
         {bubble ? (
           <>
             <span className="mr-2 text-xs text-ink-500">
-              {bubble.found ? 'ドラッグで吹き出しを移動' : '背景が見つからず下部に表示します'}
+              ドラッグで移動。画像内へ＝吹き出し／文字が外へ出る＝下部ナレーション
             </span>
             <button
               onClick={saveBubble}

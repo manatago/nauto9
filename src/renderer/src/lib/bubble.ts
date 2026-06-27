@@ -34,6 +34,8 @@ export interface BubbleLayout {
   seed: number
   w: number // bounding-box width (px) — used for background placement
   h: number // bounding-box height (px)
+  textW: number // the text block's width (inside the padding)
+  textH: number // the text block's height
 }
 
 function seedOf(text: string): number {
@@ -225,7 +227,9 @@ export function measureBubble(
     style,
     seed: seedOf(text),
     w: Math.ceil(a * 2),
-    h: Math.ceil(b * 2)
+    h: Math.ceil(b * 2),
+    textW: blockW,
+    textH: blockH
   }
 }
 
@@ -409,19 +413,33 @@ export function drawBubble(
 
 // ---- fallback caption band (horizontal subtitle) ----
 
+// Horizontal wrap for the narration band — break at 文節/punctuation opportunities
+// near the width limit (never mid-word unless a single run overflows), honour
+// manual newlines.
 function wrapH(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
   const lines: string[] = []
   for (const para of text.split(/\r?\n/)) {
-    let cur = ''
-    for (const ch of para) {
-      if (ctx.measureText(cur + ch).width > maxW && cur) {
-        lines.push(cur)
-        cur = ch
-      } else {
-        cur += ch
+    const chars = [...para]
+    let line: string[] = []
+    let lastBreak = 0
+    for (let i = 0; i < chars.length; i++) {
+      line.push(chars[i])
+      const can = canBreakAfter(chars, i)
+      if (ctx.measureText(line.join('')).width > maxW && line.length > 1) {
+        if (lastBreak > 0 && lastBreak < line.length) {
+          lines.push(line.slice(0, lastBreak).join(''))
+          line = line.slice(lastBreak)
+        } else {
+          const last = line.pop() as string
+          lines.push(line.join(''))
+          line = [last]
+        }
+        lastBreak = 0
+      } else if (can) {
+        lastBreak = line.length
       }
     }
-    lines.push(cur)
+    if (line.length) lines.push(line.join(''))
   }
   return lines.length ? lines : ['']
 }
