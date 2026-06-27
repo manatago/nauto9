@@ -490,7 +490,9 @@ export default function GenerationViewer({
   // Compose + auto-place the dialogue bubble, then enter a draggable preview. The
   // image is only modified on save (revertible via the "編集前に戻す" original).
   async function startBubble(): Promise<void> {
-    const text = (dialogue || cur.dialogue || '').trim()
+    // Strip parentheses — inner-monologue lines come wrapped in （）, but a spoken
+    // bubble/narration never uses them, so remove the bracket characters entirely.
+    const text = (dialogue || cur.dialogue || '').replace(/[（）()]/g, '').trim()
     if (!text) {
       toast.error('セリフがありません（先に生成/入力してください）')
       return
