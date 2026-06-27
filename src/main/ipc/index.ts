@@ -23,6 +23,7 @@ import { testApiKey } from '../services/xai'
 import { generateImage, getAnlas, inpaint } from '../services/novelai'
 import { detectCensors } from '../services/censor'
 import { placeBubble } from '../services/segment'
+import { detectEmotion } from '../services/emotion'
 import { exportData, importData } from '../services/backup'
 import { buildReferenceParams, referenceMode } from '../services/reference'
 import {
@@ -316,6 +317,14 @@ export function registerIpc(): void {
     if (!g || !g.image_path) throw new Error('生成画像が見つかりません')
     const png = readFileSync(storagePathFor(g.image_path))
     return placeBubble(png, boxW, boxH)
+  })
+
+  // read the character's facial expression/emotion (WD14 tagger, local)
+  handle('generations:detectEmotion', async (id: number) => {
+    const g = batchRepo.getGeneration(id)
+    if (!g || !g.image_path) throw new Error('生成画像が見つかりません')
+    const png = readFileSync(storagePathFor(g.image_path))
+    return detectEmotion(png)
   })
 
   // settings

@@ -38,3 +38,12 @@ export function resourcePath(...segs: string[]): string {
   }
   return join(app.getAppPath(), 'resources', ...segs)
 }
+
+// Cache for large models downloaded on demand (not bundled / not in git).
+export function modelCacheDir(): string {
+  const dir = app.isPackaged
+    ? join(app.getPath('userData'), 'model-cache')
+    : join(app.getAppPath(), '.model-cache')
+  mkdirSync(dir, { recursive: true })
+  return dir
+}

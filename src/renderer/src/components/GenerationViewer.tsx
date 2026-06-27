@@ -15,7 +15,7 @@ import {
   Wand2,
   X
 } from 'lucide-react'
-import type { Generation } from '@shared/types'
+import type { EmotionTag, Generation } from '@shared/types'
 import { api } from '../api'
 import { applyFineMosaic, loadImage } from '../lib/mosaic'
 import {
@@ -72,6 +72,8 @@ export default function GenerationViewer({
   const [sitPrompt, setSitPrompt] = useState('')
   const [dialogue, setDialogue] = useState('')
   const [dlgBusy, setDlgBusy] = useState(false) // separate so its spinner shows on the right button
+  const [emotions, setEmotions] = useState<EmotionTag[] | null>(null) // WD14 expression read
+  const [emoBusy, setEmoBusy] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const maskRef = useRef<HTMLCanvasElement>(null)
   const dragRef = useRef<{ x: number; y: number } | null>(null)
@@ -100,6 +102,7 @@ export default function GenerationViewer({
   // The undo is only valid for the image just regenerated; drop it on move.
   useEffect(() => {
     setUndoData(null)
+    setEmotions(null)
   }, [idx])
 
   // Keep the dialogue field synced with the current image (and after gen).
@@ -419,6 +422,21 @@ export default function GenerationViewer({
     api.generations.setDialogue(cur.id, dialogue).then(() => onChanged())
   }
 
+  // Read the character's facial expression (WD14 tagger; downloads the model on
+  // first use). For now this is just a visual readout.
+  async function detectEmo(): Promise<void> {
+    setEmoBusy(true)
+    try {
+      const tags = await api.generations.detectEmotion(cur.id)
+      setEmotions(tags)
+      if (!tags.length) toast.push('表情タグが検出されませんでした')
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setEmoBusy(false)
+    }
+  }
+
   // Redraw the live preview: the image with the bubble (or bottom narration).
   // showHandle draws the draggable tail-tip handle (omit it for the saved image).
   function renderBubblePreview(showHandle = true): void {
@@ -732,6 +750,40 @@ export default function GenerationViewer({
           >
             {busy ? <Loader2 size={14} className="animate-spin" /> : <MessageSquareText size={14} />}
             画像に表示
+          </button>
+        </div>
+      )}
+
+      {/* facial-expression readout (WD14, local) */}
+      {!mosaic && !inpaint && !bubble && (
+        <div className="flex items-center gap-2 border-t border-ink-700 bg-ink-900/60 px-6 py-1.5">
+          <span className="shrink-0 text-xs text-ink-500">感情</span>
+          <div className="flex flex-1 flex-wrap items-center gap-1.5">
+            {emotions === null ? (
+              <span className="text-xs text-ink-600">未判定</span>
+            ) : emotions.length === 0 ? (
+              <span className="text-xs text-ink-600">検出なし</span>
+            ) : (
+              emotions.map((e) => (
+                <span
+                  key={e.tag}
+                  className="rounded-full bg-ink-700 px-2 py-0.5 text-xs text-ink-200"
+                  title={`${e.tag} ${Math.round(e.score * 100)}%`}
+                >
+                  {e.label}
+                  <span className="ml-1 text-ink-500">{Math.round(e.score * 100)}%</span>
+                </span>
+              ))
+            )}
+          </div>
+          <button
+            onClick={detectEmo}
+            disabled={emoBusy}
+            title="表情を判定（初回はモデルを自動ダウンロード・約310MB）"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-ink-600 px-3 py-1 text-xs text-ink-200 hover:bg-white/10 disabled:opacity-50"
+          >
+            {emoBusy ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+            {emoBusy ? '判定中…' : '感情を判定'}
           </button>
         </div>
       )}

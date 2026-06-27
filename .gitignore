@@ -12,6 +12,8 @@ dist/
 .smoke-data/
 *.tsbuildinfo
 .detect-exp/
+# Large on-demand models cached at runtime (e.g. the WD14 emotion tagger).
+.model-cache/
 # Backup export/import scratch + aside dirs (created next to the data dir).
 .import-tmp-*/
 # Backup archives, in case one is written into the repo by accident.
