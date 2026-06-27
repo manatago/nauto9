@@ -476,9 +476,13 @@ export default function GenerationViewer({
     const canvas = bubbleCanvasRef.current
     if (!d || !canvas || !bubble) return
     const p = bubbleXY(e)
+    // Allow the bubble to spill off the image (kept ≥20% visible so it's not
+    // lost); the canvas clips whatever lands outside (overflow:hidden-like).
+    const mx = bubble.layout.w * 0.2
+    const my = bubble.layout.h * 0.2
     bubblePosRef.current = {
-      x: Math.max(0, Math.min(d.ox + (p.x - d.sx), canvas.width - bubble.layout.w)),
-      y: Math.max(0, Math.min(d.oy + (p.y - d.sy), canvas.height - bubble.layout.h))
+      x: Math.max(-bubble.layout.w + mx, Math.min(d.ox + (p.x - d.sx), canvas.width - mx)),
+      y: Math.max(-bubble.layout.h + my, Math.min(d.oy + (p.y - d.sy), canvas.height - my))
     }
     renderBubblePreview()
   }
