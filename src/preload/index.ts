@@ -70,6 +70,7 @@ const api: Api = {
     detectCensor: (id, opts) => invoke('generations:detectCensor', id, opts) as Promise<never>,
     placeBubble: (id, boxW, boxH) => invoke('generations:placeBubble', id, boxW, boxH) as Promise<never>,
     detectEmotion: (id) => invoke('generations:detectEmotion', id) as Promise<never>,
+    detectPoseScene: (id) => invoke('generations:detectPoseScene', id) as Promise<never>,
     restoreOriginal: (id) => invoke('generations:restoreOriginal', id) as Promise<never>,
     generateDialogue: (id) => invoke('generations:generateDialogue', id) as Promise<never>,
     setDialogue: (id, text) => invoke('generations:setDialogue', id, text) as Promise<never>

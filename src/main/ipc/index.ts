@@ -23,7 +23,7 @@ import { testApiKey } from '../services/xai'
 import { generateImage, getAnlas, inpaint } from '../services/novelai'
 import { detectCensors } from '../services/censor'
 import { placeBubble } from '../services/segment'
-import { detectEmotion } from '../services/emotion'
+import { detectEmotion, detectPoseScene } from '../services/emotion'
 import { exportData, importData } from '../services/backup'
 import { buildReferenceParams, referenceMode } from '../services/reference'
 import {
@@ -325,6 +325,14 @@ export function registerIpc(): void {
     if (!g || !g.image_path) throw new Error('生成画像が見つかりません')
     const png = readFileSync(storagePathFor(g.image_path))
     return detectEmotion(png)
+  })
+
+  // read the body pose + location/background (WD14 tagger on the whole image)
+  handle('generations:detectPoseScene', async (id: number) => {
+    const g = batchRepo.getGeneration(id)
+    if (!g || !g.image_path) throw new Error('生成画像が見つかりません')
+    const png = readFileSync(storagePathFor(g.image_path))
+    return detectPoseScene(png)
   })
 
   // settings

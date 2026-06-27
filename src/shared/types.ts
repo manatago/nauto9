@@ -188,11 +188,18 @@ export interface BubblePlacement {
   tailY: number
 }
 
-// A detected facial expression/emotion (WD14 tagger) with its Japanese label.
+// A detected tag (WD14 tagger) with its Japanese label — used for expression,
+// pose and scene readouts.
 export interface EmotionTag {
   tag: string // danbooru tag, e.g. "blush"
   label: string // Japanese label for display
   score: number // 0..1 confidence
+}
+
+// Body pose + location/background read from the whole image.
+export interface PoseScene {
+  pose: EmotionTag[]
+  scene: EmotionTag[]
 }
 
 // A detected region in ORIGINAL image pixel coordinates.
@@ -388,6 +395,7 @@ export interface Api {
     detectCensor(id: number, opts?: { conf?: number; pad?: number }): Promise<CensorBox[]> // suggest genital mosaic regions
     placeBubble(id: number, boxW: number, boxH: number): Promise<BubblePlacement> // background spot for a dialogue bubble
     detectEmotion(id: number): Promise<EmotionTag[]> // facial expression tags (WD14, local)
+    detectPoseScene(id: number): Promise<PoseScene> // body pose + location tags (WD14, local)
     restoreOriginal(id: number): Promise<Generation> // revert to the pre-edit (pre-mosaic) original
     generateDialogue(id: number): Promise<Generation> // LLM line for one image
     setDialogue(id: number, text: string): Promise<Generation> // manual edit

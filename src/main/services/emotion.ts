@@ -92,30 +92,100 @@ const EMO: Record<string, string> = {
   expressionless: '無表情'
 }
 
+// Body pose tags (read from the WHOLE image, not the face crop).
+const POSE: Record<string, string> = {
+  standing: '立っている',
+  sitting: '座っている',
+  lying: '寝そべり',
+  on_back: '仰向け',
+  on_stomach: 'うつ伏せ',
+  on_side: '横向き',
+  all_fours: '四つん這い',
+  kneeling: '膝立ち',
+  squatting: 'しゃがみ',
+  wariza: '女の子座り',
+  bent_over: '前かがみ',
+  leaning_forward: '前傾',
+  arched_back: '背を反らす',
+  spread_legs: '脚を開く',
+  knees_up: '膝を立てる',
+  legs_up: '脚を上げる',
+  crossed_legs: '脚を組む',
+  hand_on_hip: '腰に手',
+  arms_up: '腕を上げる',
+  crossed_arms: '腕組み',
+  straddling: '跨る',
+  'top-down_bottom-up': '尻上げ突っ伏せ',
+  presenting: '差し出すポーズ',
+  looking_back: '振り返り',
+  looking_at_viewer: '視線こちら'
+}
+
+// Location / background tags (read from the WHOLE image).
+const SCENE: Record<string, string> = {
+  outdoors: '屋外',
+  indoors: '屋内',
+  city: '街中',
+  cityscape: '街並み',
+  street: '路上',
+  alley: '路地',
+  building: '建物',
+  classroom: '教室',
+  bedroom: '寝室',
+  bathroom: '浴室/トイレ',
+  kitchen: '台所',
+  beach: 'ビーチ',
+  ocean: '海',
+  pool: 'プール',
+  onsen: '温泉',
+  forest: '森',
+  park: '公園',
+  rooftop: '屋上',
+  train_interior: '電車内',
+  car_interior: '車内',
+  office: 'オフィス',
+  sky: '空',
+  night: '夜',
+  day: '昼',
+  sunset: '夕暮れ',
+  snow: '雪',
+  rain: '雨'
+}
+
 async function download(url: string, dest: string): Promise<void> {
   const res = await fetch(url)
   if (!res.ok || !res.body) throw new Error(`モデルのダウンロードに失敗しました (${res.status})`)
   await pipeline(Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]), createWriteStream(dest))
 }
 
+interface TagIndex {
+  index: number
+  tag: string
+  label: string
+}
 interface Ready {
   session: ort.InferenceSession
-  emo: { index: number; tag: string; label: string }[]
+  emo: TagIndex[]
+  pose: TagIndex[]
+  scene: TagIndex[]
 }
 let readyPromise: Promise<Ready> | null = null
 
-function parseTags(csvPath: string): { index: number; tag: string; label: string }[] {
+// Map each curated tag (category 0) to its model output index.
+function buildIndices(csvPath: string): { emo: TagIndex[]; pose: TagIndex[]; scene: TagIndex[] } {
   const rows = readFileSync(csvPath, 'utf8').split('\n')
-  const out: { index: number; tag: string; label: string }[] = []
+  const idxByName = new Map<string, number>()
   // Row 0 is the header; data row i maps to model output index i.
   for (let i = 1; i < rows.length; i++) {
     const cols = rows[i].split(',')
-    if (cols.length < 3) continue
-    const name = cols[1]
-    const category = cols[2]
-    if (category === '0' && EMO[name]) out.push({ index: i - 1, tag: name, label: EMO[name] })
+    if (cols.length >= 3 && cols[2] === '0') idxByName.set(cols[1], i - 1)
   }
-  return out
+  const pick = (m: Record<string, string>): TagIndex[] =>
+    Object.entries(m).flatMap(([tag, label]) => {
+      const index = idxByName.get(tag)
+      return index === undefined ? [] : [{ index, tag, label }]
+    })
+  return { emo: pick(EMO), pose: pick(POSE), scene: pick(SCENE) }
 }
 
 async function init(): Promise<Ready> {
@@ -124,11 +194,25 @@ async function init(): Promise<Ready> {
   if (!existsSync(tags)) await download(TAGS_URL, tags)
   if (!existsSync(model)) await download(MODEL_URL, model)
   const session = await ort.InferenceSession.create(model)
-  return { session, emo: parseTags(tags) }
+  return { session, ...buildIndices(tags) }
 }
 function getReady(): Promise<Ready> {
   if (!readyPromise) readyPromise = init()
   return readyPromise
+}
+
+async function runTagger(session: ort.InferenceSession, img: Electron.NativeImage): Promise<Float32Array> {
+  const input = new ort.Tensor('float32', preprocess(img), [1, SIZE, SIZE, 3])
+  const result = await session.run({ [session.inputNames[0]]: input })
+  return result[session.outputNames[0]].data as Float32Array
+}
+
+function extract(probs: Float32Array, indices: TagIndex[], threshold: number, topN: number): EmotionTag[] {
+  return indices
+    .map((e) => ({ tag: e.tag, label: e.label, score: probs[e.index] }))
+    .filter((r) => r.score >= threshold)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topN)
 }
 
 // Pad to a white square, resize to 448, BGR NHWC float 0-255 (WD14 preprocessing).
@@ -172,15 +256,16 @@ async function faceCrop(png: Buffer): Promise<Electron.NativeImage> {
   return full.crop({ x, y, width: w, height: h })
 }
 
+// Facial expression — read from the cropped face for a sharper signal.
 export async function detectEmotion(png: Buffer): Promise<EmotionTag[]> {
   const { session, emo } = await getReady()
-  const img = await faceCrop(png)
-  const input = new ort.Tensor('float32', preprocess(img), [1, SIZE, SIZE, 3])
-  const result = await session.run({ [session.inputNames[0]]: input })
-  const probs = result[session.outputNames[0]].data as Float32Array
-  return emo
-    .map((e) => ({ tag: e.tag, label: e.label, score: probs[e.index] }))
-    .filter((r) => r.score >= THRESHOLD)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, TOP_N)
+  const probs = await runTagger(session, await faceCrop(png))
+  return extract(probs, emo, THRESHOLD, TOP_N)
+}
+
+// Pose + situation — read from the WHOLE image (the face crop loses body/scene).
+export async function detectPoseScene(png: Buffer): Promise<{ pose: EmotionTag[]; scene: EmotionTag[] }> {
+  const { session, pose, scene } = await getReady()
+  const probs = await runTagger(session, nativeImage.createFromBuffer(png))
+  return { pose: extract(probs, pose, 0.3, 6), scene: extract(probs, scene, 0.3, 6) }
 }
