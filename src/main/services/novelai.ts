@@ -1,5 +1,6 @@
 import { unzipSync } from 'fflate'
 import { nativeImage } from 'electron'
+import { ASPECT_SIZES, type AspectRatio } from '@shared/types'
 
 const GENERATE_URL = 'https://image.novelai.net/ai/generate-image'
 const ENCODE_VIBE_URL = 'https://image.novelai.net/ai/encode-vibe'
@@ -14,13 +15,9 @@ export const DEFAULT_NEGATIVE =
 
 const QUALITY_PREFIX = 'best quality, amazing quality, very aesthetic, '
 
-export const ASPECT_MAP = {
-  portrait: { width: 832, height: 1216 },
-  square: { width: 1024, height: 1024 },
-  landscape: { width: 1216, height: 832 }
-} as const
+export const ASPECT_MAP = ASPECT_SIZES
 
-export type Aspect = keyof typeof ASPECT_MAP
+export type Aspect = AspectRatio
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
@@ -221,7 +218,8 @@ export interface GenerateOptions {
 // Generate a single PNG. Retries on 429/5xx like nauto8.
 export async function generateImage(opts: GenerateOptions): Promise<Buffer> {
   if (!opts.token) throw new Error('NovelAI トークンが設定されていません（設定画面で入力してください）')
-  const { width, height } = ASPECT_MAP[opts.aspect ?? 'portrait']
+  // aspect_ratio is plain TEXT in SQLite, so guard against unknown values.
+  const { width, height } = ASPECT_MAP[opts.aspect as Aspect] ?? ASPECT_MAP.portrait
   const seed = opts.seed ?? Math.floor(Math.random() * (2 ** 31 - 1))
   const params = buildParams(
     width,

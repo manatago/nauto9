@@ -2,6 +2,7 @@ import { GripVertical, Sparkles, Trash2 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Situation } from '@shared/types'
+import { ASPECT_LABELS } from '@shared/types'
 
 export interface SituationCardProps {
   situation: Situation
@@ -64,7 +65,7 @@ export function SituationCard(props: SituationCardProps): JSX.Element {
         <div className="flex items-center gap-1.5">
           <span className="truncate text-xs font-medium text-ink-50">{s.name || '（無題）'}</span>
           <span className="shrink-0 rounded bg-ink-900/70 px-1 text-[9px] text-ink-300">
-            {s.aspect_ratio}
+            {ASPECT_LABELS[s.aspect_ratio] ?? s.aspect_ratio}
           </span>
         </div>
         {props.showStoryName && (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AspectRatio, Situation, Story } from '@shared/types'
+import { ASPECT_LABELS, ASPECT_SIZES } from '@shared/types'
 import { api, useSituationTags } from '../api'
 import { useToast } from './Toast'
 import Modal from './Modal'
@@ -14,11 +15,12 @@ interface Props {
   onSaved: () => void
 }
 
-const ASPECTS: { value: AspectRatio; label: string }[] = [
-  { value: 'portrait', label: '縦 (832×1216)' },
-  { value: 'square', label: '正方 (1024²)' },
-  { value: 'landscape', label: '横 (1216×832)' }
-]
+const ASPECT_ORDER: AspectRatio[] = ['portrait', 'square', 'landscape', 'ultra_portrait']
+
+const ASPECTS = ASPECT_ORDER.map((value) => {
+  const { width, height } = ASPECT_SIZES[value]
+  return { value, label: `${ASPECT_LABELS[value]} (${width}×${height})` }
+})
 
 export default function SituationModal({
   open,

@@ -58,7 +58,24 @@ export interface PreviewResult {
 
 // ---- stories & situations ----
 
-export type AspectRatio = 'portrait' | 'square' | 'landscape'
+export type AspectRatio = 'portrait' | 'square' | 'landscape' | 'ultra_portrait'
+
+// NovelAI image sizes. Each side must be a multiple of 64, and the total pixel
+// count must stay within the 1024² (1,048,576 px) free-generation budget — any
+// size under it costs no Anlas, so 512×1216 is free just like 832×1216.
+export const ASPECT_SIZES: Record<AspectRatio, { width: number; height: number }> = {
+  portrait: { width: 832, height: 1216 },
+  square: { width: 1024, height: 1024 },
+  landscape: { width: 1216, height: 832 },
+  ultra_portrait: { width: 512, height: 1216 }
+}
+
+export const ASPECT_LABELS: Record<AspectRatio, string> = {
+  portrait: '縦',
+  square: '正方',
+  landscape: '横',
+  ultra_portrait: '超縦'
+}
 
 export interface Story {
   id: number
